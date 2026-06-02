@@ -19,4 +19,4 @@ def training_tree():
 
     predictions = bdt.predict(X_test)
     
-    return bdt, predictions, X_train, y_test, w_test,
+    return bdt, predictions, y_test, w_test,
