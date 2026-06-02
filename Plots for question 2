@@ -1,1 +1,125 @@
 
+#likelihood profile for mu
+
+def plot_mu_profile(mu_vals, nll_vals, mu_hat):
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    delta_nll = nll_vals - np.min(nll_vals)
+
+    plt.figure(figsize=(8,5))
+
+    plt.plot(mu_vals, delta_nll)
+
+    plt.axvline(
+        mu_hat,
+        linestyle="--",
+        label=rf"$\hat{{\mu}}={mu_hat:.3f}$"
+    )
+
+    plt.xlabel(r"$\mu$")
+    plt.ylabel(r"$\Delta NLL$")
+    plt.title("Profile Likelihood in $\mu$")
+    plt.grid()
+    plt.legend()
+
+    plt.show()
+
+
+#Heatmap TES-JET
+
+def plot_tes_jes_scan(
+    tes_grid,
+    jes_grid,
+    nll_grid
+):
+
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(7,6))
+
+    plt.contourf(
+        tes_grid,
+        jes_grid,
+        nll_grid,
+        levels=30
+    )
+
+    plt.colorbar(label=r"$\Delta NLL$")
+
+    plt.xlabel("TES")
+    plt.ylabel("JES")
+
+    plt.title("TES-JES likelihood scan")
+
+    plt.show()
+
+plot_tes_jes_scan(
+    TES,
+    JES,
+    DELTA_NLL
+)
+
+#3D surface : 
+
+def plot_tes_jes_surface(
+    tes_grid,
+    jes_grid,
+    nll_grid
+):
+
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(8,6))
+
+    ax = fig.add_subplot(
+        111,
+        projection="3d"
+    )
+
+    ax.plot_surface(
+        tes_grid,
+        jes_grid,
+        nll_grid
+    )
+
+    ax.set_xlabel("TES")
+    ax.set_ylabel("JES")
+    ax.set_zlabel("Delta NLL")
+
+    ax.set_title(
+        "Systematic likelihood surface"
+    )
+
+    plt.show()
+
+
+def plot_confidence_contours(
+    tes_grid,
+    jes_grid,
+    delta_nll
+):
+
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(7,6))
+
+    plt.contour(
+        tes_grid,
+        jes_grid,
+        delta_nll,
+        levels=[1.15, 3.0],
+    )
+
+    plt.xlabel("TES")
+    plt.ylabel("JES")
+
+    plt.title(
+        "Confidence contours"
+    )
+
+    plt.grid()
+
+    plt.show()
