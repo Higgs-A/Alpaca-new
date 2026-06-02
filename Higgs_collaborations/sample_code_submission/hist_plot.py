@@ -60,11 +60,11 @@ def visualiser_impact_tes(model, training_dict):
         label_tag = " (NOMINAL)" if is_nominal else ""
 
         # --- SUBPLOT 1 : SIGNAL ---
-        ax1.hist(s_scores, bins=40, weights=s_w, histtype='step', 
+        ax1.hist(s_scores, bins=10, weights=s_w, histtype='step', 
                  color=colors[i], linewidth=lw, alpha=alpha, label=f"TES={val:.2f}{label_tag}")
         
         # --- SUBPLOT 2 : BRUIT ---
-        ax2.hist(b_scores, bins=40, weights=b_w, histtype='step', 
+        ax2.hist(b_scores, bins=10 , weights=b_w, histtype='step', 
                  color=colors[i], linewidth=lw, alpha=alpha, label=f"TES={val:.2f}")
 
         # --- SUBPLOT 3 : COURBE ROC ---
@@ -119,7 +119,8 @@ print("Initialisation du pipeline...")
 mon_wrapper = Model(
     get_train_set=get_train_set_custom,
     systematics=systematics,
-    model_type="sample_model"
+    # model_type="sample_model"
+    model_type = "BDT"
 )
 
 print("Entraînement du modèle...")
