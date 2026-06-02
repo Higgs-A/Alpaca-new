@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 import black_swan_pkg_main.HiggsML.datasets as datasets
 import utils
 import matplotlib.pyplot as plt
+import numpy as np
 
 class NeuralNetwork:
     """
@@ -66,6 +67,17 @@ class NeuralNetwork:
         plt.title("Courbes d'apprentissage du réseau de neurones")
         plt.legend()
         plt.grid(True)
+        plt.show()
+    
+    def plot_score_distribution(self, X_test, y_test):
+        preds = self.model.predict(self.scaler.transform(X_test)).flatten()
+        plt.figure(figsize=(8, 5))
+        plt.hist(preds[y_test == 1], bins=50, alpha=0.6, label="Signal")
+        plt.hist(preds[y_test == 0], bins=50, alpha=0.6, label="Bruit de fond")
+        plt.xlabel("Score NN")
+        plt.ylabel("Fréquence")
+        plt.title("Distribution du score du réseau de neurones")
+        plt.legend()
         plt.show()
 
 
