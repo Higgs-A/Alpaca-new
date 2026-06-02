@@ -1,3 +1,6 @@
+
+import joblib
+from tensorflow.keras.models import load_model
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from sklearn.preprocessing import StandardScaler
@@ -36,3 +39,15 @@ class NeuralNetwork:
     def predict(self, test_data):
         test_data = self.scaler.transform(test_data)
         return self.model.predict(test_data).flatten().ravel()
+
+
+def save(model,scaler,model_str ="model.keras",scaler_str ="scaler.pkl"):
+    joblib.dump(scaler, scaler_str)
+    model.save(model_str)
+
+
+
+def load(model_str ="model.keras",scaler_str ="scaler.pkl"):
+    model = load_model(model_str)
+    scaler = joblib.load(scaler_str)
+    return model,scaler
