@@ -54,7 +54,7 @@ class NeuralNetwork:
         self.scaler = joblib.load(scaler_str)
 
 
-def test_NN():
+def data_set():
     data =datasets.download_dataset("blackSwan_data") 
     data.load_train_set()
     data_set = data.get_train_set()
