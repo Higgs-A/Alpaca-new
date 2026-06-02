@@ -1,3 +1,4 @@
+from kiwisolver import strength
 import numpy as np
 from HiggsML.systematics import systematics
 from iminuit import Minuit
@@ -89,6 +90,13 @@ def calculate_saved_info(model, holdout_set):
 
 # TASK 1B : Stat-Only Likelihood Estimator
 
+#BINNED version : 
+
+# N, S et B sont déjà définis et "fixes" dans le contexte de cette analyse 
+# N : nombre d'événements observés
+# S : nombre d'événements attendus du signal pour mu=1
+# B : nombre d'événements attendus du background
+
 N_bins = 5
 def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
     '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
@@ -102,35 +110,62 @@ def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores
 
 
 def NLL(mu, N, S, B):
-    """"
-    Define the negative log-likelihood function for a counting experiment.
-    Parameters:
-    - mu: signal strength parameter (positive integer)
-    - N: observed number of events (1D array of length n_bins of positive integers)
-    - S: expected number of signal events for mu=1 (1D array of length n_bins of positive integers)
-    - B: expected number of background events (1D array of length n_bins of positive integers)
-    """    
+    '''Define the negative log-likelihood function for a counting experiment.''' 
     assert mu >= 0, "mu must be a positive integer"
-    assert np.all(N >= 0) and np.all(S >= 0) and np.all(B >= 0), (
-        "N, S and B must be positive integers"
-    )
+    assert np.all(N >= 0) and np.all(S >= 0) and np.all(B >= 0), ("N, S and B must be positive integers")
     expected = mu * S + B
     nll_val = np.sum(expected - N * np.log(expected))
     return nll_val
 
-
-# N, S et B sont déjà définis et "fixes" dans le contexte de cette analyse 
-# N : nombre d'événements observés
-# S : nombre d'événements attendus du signal pour mu=1
-# B : nombre d'événements attendus du background
-
+#minuit
 m = Minuit(lambda mu: NLL(mu, N, S, B), mu=1.0) #mu est le paramètre à estimer, initialisé à 1.0 (les autres paramètres sont fixés)
-
 m.errordef = Minuit.LIKELIHOOD # on minimise NLL
-
 m.migrad()  # recherche du minimum
 m.hesse()   # calcul des erreurs
-
+#résultats
 print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
 print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
 print("NLL_min =", m.fval)) # valeur minimale de NLL3
+
+
+
+# UNBINNED version : 
+from scipy.stats import gaussian_kde
+
+def prepare_unbinned(S_scores, S_weights, B_scores, B_weights):
+    #création des PDFs continues grâce aux scores et poids des simulations
+    pdf_S = gaussian_kde(S_scores, weights=S_weights)
+    pdf_B = gaussian_kde(B_scores, weights=B_weights)
+    #pour un nb total attendu mu=1
+    N_S_expected = np.sum(S_weights)
+    N_B_expected = np.sum(B_weights)
+    return pdf_S, pdf_B, N_S_expected, N_B_expected
+
+def unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp):
+    '''Extended Unbinned Negative Log-Likelihood function'''
+    if mu < 0: # pénalité si minuit teste un mu négatif
+        return 1e10  
+    # terme de Poisson étendu
+    N_expected_total = mu * N_S_exp + N_B_exp
+    # PDF évaluée pour chaque événement de Data
+    f_S = pdf_S(Data_scores)
+    f_B = pdf_B(Data_scores)
+    # Combinaison : vraisemblance pour chaque événement individuel
+    event_likelihood = (mu * N_S_exp * f_S + N_B_exp * f_B) / N_expected_total
+    nll_val = N_expected_total - np.sum(Data_weights * np.log(event_likelihood))
+    return nll_val
+
+# à partir des simulations 
+pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights)
+# minuit 
+nll_func = lambda mu: unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S, N_B)
+
+m = Minuit(nll_func, mu=1.0)
+m.limits["mu"] = (0, None)
+m.errordef = Minuit.LIKELIHOOD
+m.migrad() 
+m.hesse()  
+# résultats 
+print("mu_hat =", m.values["mu"])
+print("sigma_mu =", m.errors["mu"])
+print("NLL_min =", m.fval)
