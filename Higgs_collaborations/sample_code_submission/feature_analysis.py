@@ -81,3 +81,26 @@ def minimal_dependent_features(data):
 if __name__ == "__main__":
     # When run as a script, show the correlation matrix for the training set
     feature_corrilations(data_set)
+
+
+def value_signal(data_set, lst):
+    E=0
+    for i in range(lst): 
+    E += (feature_signal_background_correlations(data_set).iloc[0,lst[i]])**2
+    return E
+
+def value_correlation(data_set, lst):
+    E=0
+    for i in range(lst): 
+        for j in range(lst):
+            if i>j:
+                E += (feature_corrilations(data_set).iloc[lst[i],lst[j]])**2
+    return E
+
+def value(data_set, lst):
+    n=len(lst)
+    return value_signal(data_set, lst) - (2/n-1)*value_correlation(data_set, lst)
+        
+    
+     
+    
