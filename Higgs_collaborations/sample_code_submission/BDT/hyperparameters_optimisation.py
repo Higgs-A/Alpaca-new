@@ -2,7 +2,7 @@
 ###Max depth optimization for the BDT model. We test different values of max_depth and compute the AMS score on a validation set to find the best one###
 from get_data import get_clean_splits
 from boosted_decision_tree import BoostedDecisionTree
-from evaluation import significance_score
+from courbes import significance_score
 
 import numpy as np
 
