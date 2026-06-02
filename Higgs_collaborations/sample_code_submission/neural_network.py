@@ -4,13 +4,12 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from sklearn.preprocessing import StandardScaler
-
+import black_swan_pkg_main.HiggsML.datasets as datasets
 
 class NeuralNetwork:
     """
     This Dummy class implements a neural network classifier
     change the code in the fit method to implement a neural network classifier
-
 
     """
 
@@ -19,8 +18,10 @@ class NeuralNetwork:
 
         n_dim = train_data.shape[1]
 
-        self.model.add(Dense(10, input_dim=n_dim, activation="relu"))
-        self.model.add(Dense(10, activation="relu"))
+        self.model.add(Dense(127, input_dim=n_dim, activation="swich"))
+        self.model.add(Dense(127, activation="swish"))
+        self.model.add(Dense(127, activation="swish"))
+        self.model.add(Dense(127, activation="swish"))
         self.model.add(Dense(1, activation="sigmoid"))
 
         self.model.compile(
