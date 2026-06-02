@@ -1,5 +1,6 @@
 import numpy as np
 from HiggsML.systematics import systematics
+from iminuit import Minuit
 
 """
 Task 1a : Counting Estimator
@@ -84,3 +85,20 @@ def calculate_saved_info(model, holdout_set):
     print("saved_info", saved_info)
 
     return saved_info
+
+def nll(mu, N, S, B):
+    """"
+    Define the negative log-likelihood function for a counting experiment.
+    Parameters:
+    - mu: signal strength parameter (positive integer)
+    - N: observed number of events (1D array of length n_bins of positive integers)
+    - S: expected number of signal events for mu=1 (1D array of length n_bins of positive integers)
+    - B: expected number of background events (1D array of length n_bins of positive integers)
+    """    
+    assert mu >= 0, "mu must be a positive integer"
+    assert np.all(N >= 0) and np.all(S >= 0) and np.all(B >= 0), (
+        "N, S and B must be positive integers"
+    )
+    expected = mu * S + B
+    nll_val = np.sum(expected - N * np.log(expected))
+    return nll_val
