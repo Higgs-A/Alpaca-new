@@ -5,6 +5,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from sklearn.preprocessing import StandardScaler
 import black_swan_pkg_main.HiggsML.datasets as datasets
+import utils
 
 class NeuralNetwork:
     """
@@ -49,4 +50,9 @@ class NeuralNetwork:
     def load(self,model_str ="model.keras",scaler_str ="scaler.pkl"):
         self.model = load_model(model_str)
         self.scaler = joblib.load(scaler_str)
-        
+
+
+def test_NN():
+    data =datasets.download_dataset("blackSwan_data") 
+    data.load_train_set()
+    data_set = data.get_train_set()
