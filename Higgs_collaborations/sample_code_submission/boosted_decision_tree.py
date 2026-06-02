@@ -1,7 +1,6 @@
 from xgboost import XGBClassifier
 from sklearn.preprocessing import StandardScaler
 
-
 class BoostedDecisionTree:
     """
     This Dummy class implements a decision tree classifier
