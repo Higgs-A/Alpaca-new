@@ -189,7 +189,36 @@ if show :
     )
 
 
+def Score_systematics (data,features=features_all ) :
+    table_chi2=impact_syst_bias_all(data, features=features)
+    score = table_chi2.sum(axis=1).to_dict()
+    score_total = {}
+    for feat, chi2 in score.items():
+        base_feature = feat.replace(" (signal)", "").replace(" (background)", "")
+        score_total[base_feature] = score_total.get(base_feature, 0) + chi2
+    plt.figure(figsize=(10, 6))
+    plt.bar(score_total.keys(), score_total.values(), color="red")
+    
+    # Add labels and title
+    plt.xlabel("Features")
+    plt.ylabel("Score")
+    plt.title("Total Impact of bias Score")
 
+    # module_path = os.path.join(os.getcwd(), "sample_code_submission", "BDT")
+    # if module_path not in sys.path:
+    #   sys.path.append(module_path)
+
+    # import sample_code_submission.BDT.boosted_decision_tree as BoostedDecisionTree
+
+    # Rotate x-axis labels for better readability
+    plt.xticks(rotation=45, ha="right")
+
+    # Adjust layout to prevent clipping of labels
+    plt.tight_layout()
+
+    # Display the plot
+    plt.show()
+    return sorted(score_total.keys(), key=lambda k: score_total[k], reverse=True)
 
 def minimal_dependent_features(data):
     return data.columns
