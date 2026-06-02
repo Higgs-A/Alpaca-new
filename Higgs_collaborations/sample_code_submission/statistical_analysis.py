@@ -185,3 +185,178 @@ m.hesse()
 print("mu_hat =", m.values["mu"])
 print("sigma_mu =", m.errors["mu"])
 print("NLL_min =", m.fval)
+
+
+
+# PLOTS 
+import matplotlib.pyplot as plt
+
+def plot_likelihood(n_obs, S, B, mu_hat, plot_show=True):
+    '''Plot likelihood for Task 1a'''
+    def neg_ll(mu):
+        lam = mu * S + B
+        lam = np.clip(lam, 1e-10, None)
+        return -(n_obs * np.log(lam) - lam)
+
+    mu_vals_full = np.linspace(0, 5, 1000)
+    nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
+    nll_min = np.min(nll_vals_full)
+    delta_nll_full = nll_vals_full - nll_min
+
+    mask = delta_nll_full < 20
+    mu_vals = mu_vals_full[mask]
+    delta_nll = delta_nll_full[mask]
+
+    left_mask = mu_vals < mu_hat
+    right_mask = mu_vals > mu_hat
+
+    try:
+        from scipy.interpolate import interp1d
+        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
+        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
+        mu_lower = float(left_interp(0.5))
+        mu_upper = float(right_interp(0.5))
+        delta_mu = mu_upper - mu_lower
+    except Exception as e:
+        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
+        print("Interpolation error:", e)
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(mu_vals, delta_nll, label=r"Single Binned $\Delta$NLL", color="blue")
+    plt.axvline(mu_hat, color="red", linestyle="--", label=rf"Single Binned $\hat\mu = {mu_hat:.3f}$")
+    plt.axvline(mu_lower, color="green", linestyle="--", label=rf"Single Binned $\mu_{{-1\sigma}} = {mu_lower:.3f}$")
+    plt.axvline(mu_upper, color="green", linestyle="--", label=rf"Single Binned $\mu_{{+1\sigma}} = {mu_upper:.3f}$")
+    plt.xlabel(r"$\mu$")
+    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
+    plt.title(rf"Single Binned Profile Likelihood: $\delta\mu$ = {delta_mu:.3f}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    if plot_show: plt.show()
+
+
+def plot_binned_likelihood(N_obs, S, B, mu_hat, plot_show=True):
+    '''NLL pour la méthode binned Task 1b'''
+    def neg_ll(mu):
+        return NLL(mu, N_obs, S, B)
+
+    mu_vals_full = np.linspace(0, 5, 1000)
+    nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
+    nll_min = np.min(nll_vals_full)
+    delta_nll_full = nll_vals_full - nll_min
+
+    mask = delta_nll_full < 20
+    mu_vals = mu_vals_full[mask]
+    delta_nll = delta_nll_full[mask]
+
+    left_mask = mu_vals < mu_hat
+    right_mask = mu_vals > mu_hat
+
+    try:
+        from scipy.interpolate import interp1d
+        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
+        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
+        mu_lower = float(left_interp(0.5))
+        mu_upper = float(right_interp(0.5))
+        delta_mu = mu_upper - mu_lower
+    except Exception as e:
+        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
+        print("Interpolation error:", e)
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(mu_vals, delta_nll, label=r"Binned $\Delta$NLL", color="#4A90E2")
+    plt.axvline(mu_hat, color="#D0021B", linestyle="--", label=rf"Binned $\hat\mu = {mu_hat:.3f}$")
+    plt.axvline(mu_lower, color="#50E3C2", linestyle="--", label=rf"Binned $\mu_{{-1\sigma}} = {mu_lower:.3f}$")
+    plt.axvline(mu_upper, color="#50E3C2", linestyle="--", label=rf"Binned $\mu_{{+1\sigma}} = {mu_upper:.3f}$")
+    plt.xlabel(r"$\mu$")
+    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
+    plt.title(rf"Profile Binned Likelihood: $\delta\mu$ = {delta_mu:.3f}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    if plot_show: plt.show()
+
+
+def plot_binned_histograms(N_obs, S, B, mu_hat, N_bins=5, plot_show=True):
+    '''Binned histograms for Task 1b'''
+    plt.figure(figsize=(8, 5))
+    bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
+    width = bin_edges[1] - bin_edges[0]
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    plt.bar(bin_centers, N_obs, width=width, alpha=0.5, label="Observed", edgecolor="black")
+    plt.step(bin_centers, B, where="mid", label="Background", color="orange")
+    plt.step(bin_centers, mu_hat * S + B, where="mid", label=f"Signal + Background (mu={mu_hat:.2f})", color="green")
+
+    plt.xlabel("Score")
+    plt.ylabel("Weighted Events")
+    plt.legend()
+    plt.grid(True)
+    plt.title("Binned Histogram: Observed vs Model Prediction")
+    plt.tight_layout()
+    if plot_show: plt.show()
+
+
+def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
+    '''Plot likelihood for unbinned data (Task 1b)'''
+    def neg_ll(mu):
+        return unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp)
+
+    mu_vals_full = np.linspace(0, 5, 1000)
+    nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
+    nll_min = np.min(nll_vals_full)
+    delta_nll_full = nll_vals_full - nll_min
+
+    mask = delta_nll_full < 20
+    mu_vals = mu_vals_full[mask]
+    delta_nll = delta_nll_full[mask]
+
+    left_mask = mu_vals < mu_hat
+    right_mask = mu_vals > mu_hat
+
+    try:
+        from scipy.interpolate import interp1d
+        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
+        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
+        mu_lower = float(left_interp(0.5))
+        mu_upper = float(right_interp(0.5))
+        delta_mu = mu_upper - mu_lower
+    except Exception as e:
+        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
+        print("Interpolation error:", e)
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(mu_vals, delta_nll, label=r"Unbinned $\Delta$NLL", color="#8B008B")
+    plt.axvline(mu_hat, color="red", linestyle="--", label=rf"Unbinned $\hat\mu = {mu_hat:.3f}$")
+    plt.axvline(mu_lower, color="green", linestyle="--", label=rf"Unbinned $\mu_{{-1\sigma}} = {mu_lower:.3f}$")
+    plt.axvline(mu_upper, color="green", linestyle="--", label=rf"Unbinned $\mu_{{+1\sigma}} = {mu_upper:.3f}$")
+    plt.xlabel(r"$\mu$")
+    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
+    plt.title(rf"Profile Unbinned Likelihood: $\delta\mu$ = {delta_mu:.3f}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    if plot_show: plt.show()
+
+
+def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
+    '''plot for unbinned distributions (Task 1b) (smoothed shape)'''
+    plt.figure(figsize=(8, 5))
+    counts, bins, _ = plt.hist(Data_scores, bins=40, weights=Data_weights, alpha=0.3, label="Observed Data", color="gray", edgecolor="black")
+    
+    bin_width = bins[1] - bins[0]
+    x_plot = np.linspace(0, 1, 500)
+    
+    bkg_line = pdf_B(x_plot) * N_B_exp * bin_width
+    plt.plot(x_plot, bkg_line, label="Background", color="orange", lw=2)
+    
+    sig_bkg_line = (mu_hat * N_S_exp * pdf_S(x_plot) + N_B_exp * pdf_B(x_plot)) * bin_width
+    plt.plot(x_plot, sig_bkg_line, label=f"Signal + Background (mu={mu_hat:.2f})", color="green", lw=2)
+    
+    plt.xlabel("Score")
+    plt.ylabel("Events")
+    plt.title("Unbinned Distribution: Observed vs Model Prediction")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    if plot_show: plt.show()
