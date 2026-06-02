@@ -37,7 +37,7 @@ class NeuralNetwork:
         self.scaler.fit_transform(train_data)
         X_train = self.scaler.transform(train_data)
         history = self.model.fit(
-            X_train, y_train, sample_weight=weights_train, epochs=5, verbose=2
+            X_train, y_train, sample_weight=weights_train, epochs=100, verbose=2
         )
         self.history = history  # permet de conserver des données pour le tracé des courbes d'apprentissage
 
