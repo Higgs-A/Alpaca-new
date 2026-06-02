@@ -27,22 +27,21 @@ Task 2 : Systematic Uncertainty
 
 
 def compute_mu(score, weight, saved_info):
-    """
-    Perform calculations to calculate mu
-    Dummy code, replace with actual calculations
-    Feel free to add more functions and change the function parameters
 
-    """
-
-    score = score.flatten() > 0.5
+    score = score.flatten() > 0.5 
     score = score.astype(int)
 
-    mu = (np.sum(score * weight) - saved_info["beta"]) / saved_info["gamma"]
-    del_mu_stat = (
-        np.sqrt(saved_info["beta"] + saved_info["gamma"]) / saved_info["gamma"]
-    )
-    del_mu_sys = abs(0.0 * mu)
-    del_mu_tot = np.sqrt(del_mu_stat**2 + del_mu_sys**2)
+    N_obs = np.sum(score * weight)
+
+    mu = (
+        N_obs - saved_info["beta"]
+    ) / saved_info["gamma"]
+
+    del_mu_stat = (np.sqrt(saved_info["beta"]+ saved_info["gamma"])/ saved_info["gamma"])
+
+    del_mu_sys = 0.0
+
+    del_mu_tot = del_mu_stat
 
     return {
         "mu_hat": mu,
@@ -51,24 +50,45 @@ def compute_mu(score, weight, saved_info):
         "del_mu_tot": del_mu_tot,
     }
 
-
 def calculate_saved_info(model, holdout_set):
-    """
-    Calculate the saved_info dictionary for mu calculation
-    Replace with actual calculations
-    """
 
     score = model.predict(holdout_set["data"])
 
-    from systematic_analysis import tes_fitter
-    from systematic_analysis import jes_fitter
-
     print("score shape before threshold", score.shape)
 
-    score = score.flatten() > 0.5
+    #We compute the optimized threshold by avergage median signficance method
+    MAX = sorted(set(score))[-1] 
+    threshold_list = np.linspace(0, MAX, 100) #We generate 100 values of potential threshold values 
+    ams = [0] * 100
+ 
+    for i, t in enumerate(threshold_list): #We iterate over the values of threshold in order to compute AMS
+ 
+        score_bis = score.flatten() > t
+        score_bis = score_bis.astype(int)
+ 
+        label = holdout_set["labels"]
+ 
+        gamma = np.sum(holdout_set["weights"] * score2 * label)
+ 
+        beta = np.sum(holdout_set["weights"] * score2 * (1 - label))
+ 
+        ams[i] = np.sqrt(2 * ((gamma + beta) * np.log(1 + gamma / beta) - gamma))
+ 
+    index = np.argmax(ams)
+    threshold = threshold_list[best_idx]   #We keep the threshold value that maximizes the AMS
+
+    score = score.flatten() > threshold
     score = score.astype(int)
 
     label = holdout_set["labels"]
+
+    gamma = np.sum(
+    holdout_set["weights"] * score * label
+    )
+
+    beta = np.sum(
+    holdout_set["weights"] * score * (1 - label)
+    )
 
     print("score shape after threshold", score.shape)
 
@@ -77,16 +97,12 @@ def calculate_saved_info(model, holdout_set):
     beta = np.sum(holdout_set["weights"] * score * (1 - label))
 
     saved_info = {
-        "beta": beta,
-        "gamma": gamma,
-        "tes_fit": tes_fitter(model, holdout_set),
-        "jes_fit": jes_fitter(model, holdout_set),
+    "beta": beta,
+    "gamma": gamma,
+    "threshold": threshold
     }
 
     print("saved_info", saved_info)
-
-    return saved_info
-
 
 # TASK 1B : Stat-Only Likelihood Estimator
 
