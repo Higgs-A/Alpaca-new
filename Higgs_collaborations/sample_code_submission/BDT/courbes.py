@@ -62,8 +62,8 @@ def significance_score(y_true, y_score, sample_weight=None):
 
 # --- 1. COURBE ROC AUC ---
 if __name__ == "__main__":
-    bdt, y_pred_test,y_test, weights_test_arr=training_tree()
-    from training_tree import X_train, X_test,y_train, w_train
+    y_pred_test=training_tree()[1]
+    X_train, X_test,y_train, y_test, w_train,weights_test_arr=get_clean_splits()
 
     plt.figure(figsize=(8, 6))
     auc_test = roc_auc_score(
@@ -146,11 +146,6 @@ if __name__ == "__main__":
         
         # Normalisation locale temporaire des poids de train pour le scoring de la courbe d'apprentissage
         w_tr_sub_arr = np.array(w_tr_sub)
-        class_weights_sub = (w_tr_sub_arr[y_tr_sub == 0].sum(), w_tr_sub_arr[y_tr_sub == 1].sum())
-        for idx in [0, 1]:
-            if class_weights_sub[idx] > 0:
-                w_tr_sub_arr[y_tr_sub == idx] *= max(class_weights_sub) / class_weights_sub[idx]
-
         auc_train_lc = roc_auc_score(
             y_true=y_tr_sub, y_score=y_pred_train_lc, sample_weight=w_tr_sub_arr
         )
