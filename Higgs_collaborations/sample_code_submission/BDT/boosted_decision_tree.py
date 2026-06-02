@@ -17,14 +17,14 @@ class BoostedDecisionTree:
         self.model = XGBClassifier(
             n_estimators=1000,        # L'early stopping l'arrêtera bien avant
             learning_rate=0.05,
-            max_depth=6,
+            max_depth=9,
             subsample=0.8,
             colsample_bytree=0.8,
             reg_alpha=0.1,            # Régularisation L1 (évite l'overfitting)
             reg_lambda=1.0,           # Régularisation L2
             use_label_encoder=False,
             eval_metric="logloss",
-            early_stopping_rounds=30, # S'arrête si la validation ne s'améliore plus pendant 30 arbres
+            early_stopping_rounds=60, # S'arrête si la validation ne s'améliore plus pendant 60 arbres
             random_state=42,
         )
 

@@ -11,7 +11,7 @@ def optimize_max_depth():
 
     X_train, X_test, y_train, y_test, w_train, w_test = get_clean_splits()
 
-    depths = [4, 5, 6, 7, 8, 9]
+    depths = [5,6,7,8,9,10]
 
     best_depth = None
     best_significance = -np.inf
@@ -79,6 +79,5 @@ def optimize_max_depth():
     return best_depth, results
 
 
-if __name__ == "__main__":
 
-    optimize_max_depth()
+optimize_max_depth()

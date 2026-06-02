@@ -58,110 +58,111 @@ def significance_score(y_true, y_score, sample_weight=None):
     return np.max(vsig)
 
 
-bdt, y_pred_test,y_test, weights_test_arr=training_tree()
-from training_tree import X_train, X_test, y_train, w_train
-
 
 
 # --- 1. COURBE ROC AUC ---
-plt.figure(figsize=(8, 6))
-auc_test = roc_auc_score(
-    y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
-)
-fpr, tpr, _ = roc_curve(
-    y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
-)
+if __name__ == "__main__":
+    bdt, y_pred_test,y_test, weights_test_arr=training_tree()
+    from training_tree import X_train, X_test,y_train, w_train
 
-plt.plot(
-    fpr, tpr, color="darkgreen", lw=2, label="XGBoost Classe (AUC = {:.3f})".format(auc_test)
-)
-plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel("Background Efficiency")
-plt.ylabel("Signal Efficiency")
-plt.title("ROC Curve")
-plt.legend(loc="lower right")
-plt.grid(True, linestyle="--", alpha=0.5)
-plt.show()
-
-# --- 2. COURBE DE SIGNIFICATIVITÉ ---
-plt.figure(figsize=(8, 6))
-vamsasimov_res = significance_vscore(
-    y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
-)
-significance_max = significance_score(
-    y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
-)
-
-x_thresholds = np.linspace(0, 1, num=len(vamsasimov_res))
-
-plt.plot(
-    x_thresholds,
-    vamsasimov_res,
-    color="darkgreen",
-    lw=2,
-    label="XGBoost (Z max = {:.2f})".format(significance_max),
-)
-plt.title("BDT Significance vs Threshold")
-plt.xlabel("Threshold")
-plt.ylabel("Significance (Z)")
-plt.legend(loc="best")
-plt.grid(True, linestyle="--", alpha=0.5)
-plt.show()
-
-# --- 3. LEARNING CURVE ---
-# Utilisation de la logique de boucle manuelle sur les tailles pour intégrer votre classe
-train_sizes = [0.05, 0.1, 0.2, 0.5, 0.75, 1.0]
-ntrains = []
-test_aucs = []
-train_aucs = []
-
-print("\n--- Génération de la Learning Curve ---")
-for t_size in train_sizes:
-    ntrain = int(len(X_train) * t_size)
-    print(f"Calcul pour {ntrain} événements...")
-    ntrains.append(ntrain)
-
-    # Ré-instanciation d'un modèle vierge à chaque étape de taille pour éviter les effets de mémoire
-    lc_model = BoostedDecisionTree()
-    
-    # Entraînement partiel
-    X_tr_sub = X_train.iloc[:ntrain] if isinstance(X_train, pd.DataFrame) else X_train[:ntrain]
-    y_tr_sub = y_train.iloc[:ntrain] if isinstance(y_train, pd.Series) else y_train[:ntrain]
-    w_tr_sub = w_train.iloc[:ntrain] if isinstance(w_train, pd.Series) else w_train[:ntrain]
-    
-    lc_model.fit(X_tr_sub, y_tr_sub, weights=w_tr_sub)
-
-    # Évaluation sur l'ensemble de Test fixe
-    y_pred_test_lc = lc_model.predict(X_test)
-    auc_test_lc = roc_auc_score(
-        y_true=y_test, y_score=y_pred_test_lc, sample_weight=weights_test_arr
+    plt.figure(figsize=(8, 6))
+    auc_test = roc_auc_score(
+        y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
     )
-    test_aucs.append(auc_test_lc)
-
-    # Évaluation sur la portion de Train courante
-    y_pred_train_lc = lc_model.predict(X_tr_sub)
-    
-    # Normalisation locale temporaire des poids de train pour le scoring de la courbe d'apprentissage
-    w_tr_sub_arr = np.array(w_tr_sub)
-    class_weights_sub = (w_tr_sub_arr[y_tr_sub == 0].sum(), w_tr_sub_arr[y_tr_sub == 1].sum())
-    for idx in [0, 1]:
-        if class_weights_sub[idx] > 0:
-            w_tr_sub_arr[y_tr_sub == idx] *= max(class_weights_sub) / class_weights_sub[idx]
-
-    auc_train_lc = roc_auc_score(
-        y_true=y_tr_sub, y_score=y_pred_train_lc, sample_weight=w_tr_sub_arr
+    fpr, tpr, _ = roc_curve(
+        y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
     )
-    train_aucs.append(auc_train_lc)
 
-# Tracé final de la Learning Curve
-plt.figure(figsize=(8, 6))
-plt.plot(ntrains, train_aucs, "o-", color="blue", label="Train AUC")
-plt.plot(ntrains, test_aucs, "o-", color="orange", label="Test AUC")
-plt.title("Learning Curve (Modèle Autonome avec Early Stopping)")
-plt.xlabel("Number of Training Events")
-plt.ylabel("ROC AUC Score")
-plt.legend(loc="best")
-plt.grid(True, linestyle="--", alpha=0.5)
-plt.show()
+    plt.plot(
+        fpr, tpr, color="darkgreen", lw=2, label="XGBoost Classe (AUC = {:.3f})".format(auc_test)
+    )
+    plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Background Efficiency")
+    plt.ylabel("Signal Efficiency")
+    plt.title("ROC Curve")
+    plt.legend(loc="lower right")
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.show()
+
+    # --- 2. COURBE DE SIGNIFICATIVITÉ ---
+    plt.figure(figsize=(8, 6))
+    vamsasimov_res = significance_vscore(
+        y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
+    )
+    significance_max = significance_score(
+        y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
+    )
+
+    x_thresholds = np.linspace(0, 1, num=len(vamsasimov_res))
+
+    plt.plot(
+        x_thresholds,
+        vamsasimov_res,
+        color="darkgreen",
+        lw=2,
+        label="XGBoost (Z max = {:.2f})".format(significance_max),
+    )
+    plt.title("BDT Significance vs Threshold")
+    plt.xlabel("Threshold")
+    plt.ylabel("Significance (Z)")
+    plt.legend(loc="best")
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.show()
+
+    # --- 3. LEARNING CURVE ---
+    # Utilisation de la logique de boucle manuelle sur les tailles pour intégrer votre classe
+    train_sizes = [0.05, 0.1, 0.2, 0.5, 0.75, 1.0]
+    ntrains = []
+    test_aucs = []
+    train_aucs = []
+
+    print("\n--- Génération de la Learning Curve ---")
+    for t_size in train_sizes:
+        ntrain = int(len(X_train) * t_size)
+        print(f"Calcul pour {ntrain} événements...")
+        ntrains.append(ntrain)
+
+        # Ré-instanciation d'un modèle vierge à chaque étape de taille pour éviter les effets de mémoire
+        lc_model = BoostedDecisionTree()
+        
+        # Entraînement partiel
+        X_tr_sub = X_train.iloc[:ntrain] if isinstance(X_train, pd.DataFrame) else X_train[:ntrain]
+        y_tr_sub = y_train.iloc[:ntrain] if isinstance(y_train, pd.Series) else y_train[:ntrain]
+        w_tr_sub = w_train.iloc[:ntrain] if isinstance(w_train, pd.Series) else w_train[:ntrain]
+        
+        lc_model.fit(X_tr_sub, y_tr_sub, weights=w_tr_sub)
+
+        # Évaluation sur l'ensemble de Test fixe
+        y_pred_test_lc = lc_model.predict(X_test)
+        auc_test_lc = roc_auc_score(
+            y_true=y_test, y_score=y_pred_test_lc, sample_weight=weights_test_arr
+        )
+        test_aucs.append(auc_test_lc)
+
+        # Évaluation sur la portion de Train courante
+        y_pred_train_lc = lc_model.predict(X_tr_sub)
+        
+        # Normalisation locale temporaire des poids de train pour le scoring de la courbe d'apprentissage
+        w_tr_sub_arr = np.array(w_tr_sub)
+        class_weights_sub = (w_tr_sub_arr[y_tr_sub == 0].sum(), w_tr_sub_arr[y_tr_sub == 1].sum())
+        for idx in [0, 1]:
+            if class_weights_sub[idx] > 0:
+                w_tr_sub_arr[y_tr_sub == idx] *= max(class_weights_sub) / class_weights_sub[idx]
+
+        auc_train_lc = roc_auc_score(
+            y_true=y_tr_sub, y_score=y_pred_train_lc, sample_weight=w_tr_sub_arr
+        )
+        train_aucs.append(auc_train_lc)
+
+    # Tracé final de la Learning Curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(ntrains, train_aucs, "o-", color="blue", label="Train AUC")
+    plt.plot(ntrains, test_aucs, "o-", color="orange", label="Test AUC")
+    plt.title("Learning Curve (Modèle Autonome avec Early Stopping)")
+    plt.xlabel("Number of Training Events")
+    plt.ylabel("ROC AUC Score")
+    plt.legend(loc="best")
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.show()
