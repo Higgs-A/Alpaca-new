@@ -87,13 +87,18 @@ def calculate_saved_info(model, holdout_set):
     return saved_info
 
 
+# TASK 1B : Stat-Only Likelihood Estimator
 
-
-
-
-
-
-
+N_bins = 5
+def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
+    '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
+    # bin boundaries between 0 and 1
+    bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
+    # each array bin by bin
+    N_obs, _ = np.histogram(Data_scores, bins=bin_edges, weights=Data_weights)
+    S, _ = np.histogram(S_scores, bins=bin_edges, weights=S_weights)
+    B, _ = np.histogram(B_scores, bins=bin_edges, weights=B_weights)
+    return N_obs, S, B
 
 
 def NLL(mu, N, S, B):
@@ -114,9 +119,6 @@ def NLL(mu, N, S, B):
     return nll_val
 
 
-import numpy as np
-from iminuit import Minuit
-
 # N, S et B sont déjà définis et "fixes" dans le contexte de cette analyse 
 # N : nombre d'événements observés
 # S : nombre d'événements attendus du signal pour mu=1
@@ -131,9 +133,4 @@ m.hesse()   # calcul des erreurs
 
 print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
 print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
-print("NLL_min =", m.fval)) # valeur minimale de NLL
- 
-
- #alexia
-
-
+print("NLL_min =", m.fval)) # valeur minimale de NLL3
