@@ -41,13 +41,11 @@ class NeuralNetwork:
         return self.model.predict(test_data).flatten().ravel()
 
 
-def save(model,scaler,model_str ="model.keras",scaler_str ="scaler.pkl"):
-    joblib.dump(scaler, scaler_str)
-    model.save(model_str)
+    def save(self,model_str ="model.keras",scaler_str ="scaler.pkl"):
+        joblib.dump(self.scaler, scaler_str)
+        self.model.save(model_str)
 
-
-
-def load(model_str ="model.keras",scaler_str ="scaler.pkl"):
-    model = load_model(model_str)
-    scaler = joblib.load(scaler_str)
-    return model,scaler
+    def load(self,model_str ="model.keras",scaler_str ="scaler.pkl"):
+        self.model = load_model(model_str)
+        self.scaler = joblib.load(scaler_str)
+        
