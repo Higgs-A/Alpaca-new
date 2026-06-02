@@ -101,3 +101,15 @@ for i in [0, 1]:
     weights_test_arr[y_test == i] *= 1 / (1 - train_size)
 
 
+# 
+print("\nDébut de l'entraînement du modèle autonome...")
+bdt_model = BoostedDecisionTree()
+
+# On passe le lot d'entraînement brut (la classe gère sa validation interne et son scaling)
+bdt_model.fit(X_train, y_train, weights=weights_train)
+print("Modèle entraîné avec succès (Early Stopping appliqué en interne).")
+
+# Évaluation des scores de probabilité
+y_pred_test = bdt_model.predict(X_test)
+y_pred_train = bdt_model.predict(X_train)
+
