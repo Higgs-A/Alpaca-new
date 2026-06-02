@@ -86,3 +86,18 @@ def significance_score(y_true, y_score, sample_weight=None):
     """Retourne la signification maximale trouvée (Z max)"""
     vsig = significance_vscore(y_true, y_score, sample_weight)
     return np.max(vsig)
+
+
+train_size = 0.75
+X_train, X_test, y_train, y_test, weights_train, weights_test = (
+    train_test_split(data, target, weights, train_size=train_size)
+)
+
+# Conversion immédiate des poids de test en array numpy pour éviter les indexations désalignées
+weights_test_arr = np.array(weights_test)
+
+# Correction du poids du lot de test pour compenser l'échantillonnage global (25% restants)
+for i in [0, 1]:
+    weights_test_arr[y_test == i] *= 1 / (1 - train_size)
+
+
