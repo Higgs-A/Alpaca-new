@@ -6,6 +6,7 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import itertools
 
 # Changer vers le dossier du script pour télécharger les données localement
 os.chdir(os.path.dirname(__file__))
@@ -43,9 +44,16 @@ def feature_signal_background_correlations(data):
     plt.title("Correlation matrix of features")
     plt.show()
     print(dfplot)
+    return dfplot
     del dfplot
-feature_signal_background_correlations(data_set)
+#feature_signal_background_correlations(data_set)
 
+def best_features_set(n):
+    k = 4  # Les entiers iront de 0 à 4 inclus (0, 1, 2, 3, 4)
+    les_entiers = range(k + 1)
+    combinaisons = list(itertools.combinations(les_entiers, n))
+    return combinaisons
+print(best_features_set(3))
 
 def systematics_dependence(data):
     pass
