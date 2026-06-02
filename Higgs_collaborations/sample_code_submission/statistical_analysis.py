@@ -84,3 +84,18 @@ def calculate_saved_info(model, holdout_set):
     print("saved_info", saved_info)
 
     return saved_info
+
+
+# TASK 1B : Stat-Only Likelihood Estimator
+
+N_bins = 5
+
+def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
+    '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
+    # bin boundaries between 0 and 1
+    bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
+    # each array bin by bin
+    N_obs, _ = np.histogram(Data_scores, bins=bin_edges, weights=Data_weights)
+    S, _ = np.histogram(S_scores, bins=bin_edges, weights=S_weights)
+    B, _ = np.histogram(B_scores, bins=bin_edges, weights=B_weights)
+    return N_obs, S, B
