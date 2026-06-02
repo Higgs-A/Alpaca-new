@@ -104,6 +104,11 @@ def systematic_dependence(data, show=False, features=features_all):
                 errs_bkg = quad_err(background_biased,background_original)
                 quad_errs[f"{feat} (signal)"][f"{b_name} ({err})"] = errs_sig
                 quad_errs[f"{feat} (background)"][f"{b_name} ({err})"] = errs_bkg
+        
+        
+    quad_df = pd.DataFrame.from_dict(quad_errs, orient="index")
+    
+    if show:
             
             # Plotting the distributions for the current bias and feature
                 if show :
@@ -190,10 +195,28 @@ def systematic_dependence(data, show=False, features=features_all):
             plt.legend()
             plt.tight_layout()
             plt.show()
+    return quad_df
+
+
+def Score_systematics (data,features=features_all ) :
+    table_chi2=systematic_dependence(data, show=False, features=features)
+    score = table_chi2.sum(axis=1).to_dict()
+    score_total = {}
+    for feat, chi2 in score.items():
+        base_feature = feat.replace(" (signal)", "").replace(" (background)", "")
+        score_total[base_feature] = score_total.get(base_feature, 0) + chi2
+    plt.figure(figsize=(10, 6))
+    plt.bar(score_total.keys(), score_total.values(), color="red")
     
-
-
-
+    # Add labels and title
+    plt.xlabel("Features")
+    plt.ylabel("Score")
+    plt.title("Total Impact of bias Score")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+    plt.show()
+    
+    return sorted(score_total.keys(), key=lambda k: score_total[k], reverse=True)
 
 def minimal_dependent_features(data):
     return data.columns
