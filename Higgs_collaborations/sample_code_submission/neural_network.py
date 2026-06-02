@@ -5,6 +5,8 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from sklearn.preprocessing import StandardScaler
 import black_swan_pkg_main.HiggsML.datasets as datasets
+from tabulate import tabulate
+import numpy as np
 import utils
 import matplotlib.pyplot as plt
 import numpy as np
@@ -81,8 +83,63 @@ class NeuralNetwork:
         plt.show()
 
 
-def test_NN():
+def data_set():
     data =datasets.download_dataset("blackSwan_data") 
     data.load_train_set()
     data_set = data.get_train_set()
 
+def visualize_data(data_set):
+    
+
+    target = data_set["labels"]
+    weights = data_set["weights"]
+    detailed_label = data_set["detailed_labels"]
+    keys = np.unique(detailed_label)
+
+
+    weight_keys = {}
+    average_weights = {}
+    for key in keys:
+        weight_keys[key] = weights[detailed_label == key]
+
+    table_data = []
+    for key in keys:
+        table_data.append(
+            [
+                key,
+                np.sum(weight_keys[key]),
+                len(weight_keys[key]),
+                np.mean(weight_keys[key]),
+            ]
+        )
+
+    table_data.append(
+        [
+            "Total Signal",
+            np.sum(weights[target == 1]),
+            len(weights[target == 1]),
+            np.mean(weights[target == 1]),
+        ]
+    )
+    table_data.append(
+        [
+            "Total Background",
+            np.sum(weights[target == 0]),
+            len(weights[target == 0]),
+            np.mean(weights[target == 0]),
+        ]
+    )
+
+    print("[*] --- Detailed Label Summary")
+    print(
+        tabulate(
+            table_data,
+            headers=[
+                "Detailed Label",
+                "Total Weight",
+                "Number of events",
+                "Average Weight",
+            ],
+            tablefmt="grid",
+        )
+    )
