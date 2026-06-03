@@ -630,6 +630,41 @@ def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp
 
 #Task 2: on ne travaille qu'avec une méthode binned pour l'instant
 
+
+
+
+def NLL_mu_tes_jes(mu, tes, jes, n_obs, f, g):
+
+#on suppose que f et g sont les fonctions d'interpolations calculées par systematic_analysis.py pour gamma i et beta i respectivement 
+#f et g sont sous la forme d'un tableau de fonctions évaluées dans les bins, par exemple f[i](tes) donne la valeur de la fonction f pour le bin i et une valeur de tes. De même pour g[i](jes).
+#n-obs: tableau des nombres d'observations dans les bins, par exemple n_obs[i] donne le nombre d'observations dans le bin i.
+# tes_min et tes_max sont les limites de tes, jes_min et jes_max sont les limites de jes. Ces limites seront utilisées pour contraindre les paramètres tes et jes lors de l'optimisation avec Minuit.
+    nll = 0.0
+
+    for i in range(len(n_obs)):
+
+        # Signal prediction in bin i
+        gamma_i = f[i](tes)
+
+        # Background prediction in bin i
+        beta_i = g[i](jes)
+
+        # Expected number of events in bin i
+        lambda_i = mu * gamma_i + beta_i
+
+        # Prevent log(0)
+        lambda_i = max(lambda_i, 1e-10)
+
+        # Poisson likelihood contribution
+        nll -= (
+            n_obs[i] * np.log(lambda_i)
+            - lambda_i
+        )
+
+    return nll
+
+#minuit
+
 def likelihood_fit_mu_tes_jes(
     n_obs,
     f,
@@ -639,57 +674,302 @@ def likelihood_fit_mu_tes_jes(
     jes_min,
     jes_max,
 ):
-#on suppose que f et g sont les fonctions d'interpolations calculées par systematic_analysis.py pour gamma i et beta i respectivement 
-#f et g sont sous la forme d'un tableau de fonctions évaluées dans les bins, par exemple f[i](tes) donne la valeur de la fonction f pour le bin i et une valeur de tes. De même pour g[i](jes).
-#n-obs: tableau des nombres d'observations dans les bins, par exemple n_obs[i] donne le nombre d'observations dans le bin i.
-# tes_min et tes_max sont les limites de tes, jes_min et jes_max sont les limites de jes. Ces limites seront utilisées pour contraindre les paramètres tes et jes lors de l'optimisation avec Minuit.
-    n_bins = len(n_obs)
 
-    def NLL(mu, tes, jes):
+    #Minimize the NLL with respect to mu,tes et jes
 
-        nll = 0.0
-
-        for i in range(n_bins):
-
-            gamma_i = f[i](tes)
-
-            beta_i = g[i](jes)
-
-            lambda_i = mu * gamma_i + beta_i
-
-            lambda_i = max(lambda_i, 1e-10)
-
-            nll -= (
-                n_obs[i] * np.log(lambda_i)
-                - lambda_i
-            )
-
-        return nll
 
     m = Minuit(
-        NLL,
+        lambda mu, tes, jes:
+        NLL(mu, tes, jes, n_obs, f, g),
+
         mu=1.0,
         tes=1.0,
         jes=1.0,
     )
 
     m.limits["mu"] = (0, None)
-
     m.limits["tes"] = (tes_min, tes_max)
-
     m.limits["jes"] = (jes_min, jes_max)
 
     m.errordef = Minuit.LIKELIHOOD
 
+    # Find minimum
     m.migrad()
+
+    # Compute uncertainties
     m.hesse()
 
     return {
         "mu": m.values["mu"],
         "mu_err": m.errors["mu"],
+
         "tes": m.values["tes"],
         "tes_err": m.errors["tes"],
+
         "jes": m.values["jes"],
         "jes_err": m.errors["jes"],
+
         "nll_min": m.fval,
     }
+
+#Plots pour les scans de profil de vraisemblance pour mu, tes et jes (2 paramètres sur 3) fixés à leur valeur de fit pour chaque scan)
+
+def plot_delta_nll_mu_tes_jes(
+    x_values,
+    delta_nll,
+    x_hat,
+    parameter_name,
+):
+
+    """
+    Plot ΔNLL for one parameter.
+
+    Also determines the ±1σ interval using
+
+        ΔNLL = 0.5
+
+    which corresponds to the 68% confidence interval
+    for one fitted parameter.
+    """
+
+    ##########################################################################
+    # Determine ±1σ interval
+    ##########################################################################
+
+    left_mask = x_values < x_hat
+    right_mask = x_values > x_hat
+
+    try:
+
+        left_interp = interp1d(
+            delta_nll[left_mask],
+            x_values[left_mask],
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+
+        right_interp = interp1d(
+            delta_nll[right_mask],
+            x_values[right_mask],
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+
+        x_minus = float(left_interp(0.5))
+        x_plus = float(right_interp(0.5))
+
+    except Exception:
+
+        x_minus = x_hat
+        x_plus = x_hat
+
+
+    plt.figure(figsize=(8, 5))
+
+    plt.plot(
+        x_values,
+        delta_nll,
+        linewidth=2,
+        label=rf"$\Delta$NLL({parameter_name})",
+    )
+
+    # Best-fit value
+    plt.axvline(
+        x_hat,
+        color="red",
+        linestyle="--",
+        label=rf"{parameter_name}_hat = {x_hat:.4f}",
+    )
+
+    # ΔNLL = 0.5 line
+    plt.axhline(
+        0.5,
+        color="black",
+        linestyle=":",
+        label=r"$\Delta$NLL = 0.5",
+    )
+
+    # Confidence interval
+    plt.axvline(
+        x_minus,
+        color="green",
+        linestyle=":",
+    )
+
+    plt.axvline(
+        x_plus,
+        color="green",
+        linestyle=":",
+    )
+
+    # Markers
+    plt.scatter(
+        [x_hat],
+        [0],
+        color="red",
+        zorder=10,
+    )
+
+    plt.scatter(
+        [x_minus, x_plus],
+        [0.5, 0.5],
+        color="green",
+        zorder=10,
+    )
+
+    #annonations sur les courbes
+
+    plt.annotate(
+        rf"{x_hat:.4f}",
+        (x_hat, 0),
+        xytext=(10, 10),
+        textcoords="offset points",
+    )
+
+    plt.annotate(
+        rf"{x_minus:.4f}",
+        (x_minus, 0.5),
+        xytext=(-50, 10),
+        textcoords="offset points",
+    )
+
+    plt.annotate(
+        rf"{x_plus:.4f}",
+        (x_plus, 0.5),
+        xytext=(10, 10),
+        textcoords="offset points",
+    )
+
+    plt.xlabel(parameter_name)
+
+    plt.ylabel(r"$\Delta$NLL")
+
+    plt.title(
+        rf"Profile likelihood scan : {parameter_name}"
+    )
+
+    plt.grid(True)
+
+    plt.legend()
+
+    plt.tight_layout()
+
+    plt.show()
+
+
+##############################################################################
+#                       PROFILE LIKELIHOOD SCANS
+##############################################################################
+
+def plot_profile_likelihood_scans(
+    fit_result,
+    n_obs,
+    f,
+    g,
+    tes_min,
+    tes_max,
+    jes_min,
+    jes_max,
+):
+    """
+    Produce three profile likelihood scans:
+
+        ΔNLL(mu)
+        ΔNLL(TES)
+        ΔNLL(JES)
+
+    For each scan, the other two parameters
+    are fixed to their best-fit values.
+    """
+
+    # Best-fit values with minuit
+
+
+    mu_hat = fit_result["mu"]
+
+    tes_hat = fit_result["tes"]
+
+    jes_hat = fit_result["jes"]
+
+    nll_min = fit_result["nll_min"]
+
+    #mu libre
+
+    mu_values = np.linspace(
+        max(0, mu_hat - 3),
+        mu_hat + 3,
+        1000,
+    )
+
+    delta_nll_mu = np.array([
+        NLL(
+            mu,
+            tes_hat,
+            jes_hat,
+            n_obs,
+            f,
+            g,
+        ) - nll_min
+        for mu in mu_values
+    ])
+
+    plot_delta_nll_scan(
+        mu_values,
+        delta_nll_mu,
+        mu_hat,
+        r"\mu",
+    )
+
+    #tes libre
+
+    tes_values = np.linspace(
+        tes_min,
+        tes_max,
+        1000,
+    )
+
+    delta_nll_tes = np.array([
+        NLL(
+            mu_hat,
+            tes,
+            jes_hat,
+            n_obs,
+            f,
+            g,
+        ) - nll_min
+        for tes in tes_values
+    ])
+
+    plot_delta_nll_scan(
+        tes_values,
+        delta_nll_tes,
+        tes_hat,
+        "TES",
+    )
+
+    #jes libre
+
+    jes_values = np.linspace(
+        jes_min,
+        jes_max,
+        1000,
+    )
+
+    delta_nll_jes = np.array([
+        NLL(
+            mu_hat,
+            tes_hat,
+            jes,
+            n_obs,
+            f,
+            g,
+        ) - nll_min
+        for jes in jes_values
+    ])
+
+    plot_delta_nll_scan(
+        jes_values,
+        delta_nll_jes,
+        jes_hat,
+        "JES",
+    )
