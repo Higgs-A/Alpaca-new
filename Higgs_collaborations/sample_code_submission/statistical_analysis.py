@@ -191,7 +191,20 @@ def unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp):
     nll_val = N_expected_total - np.sum(Data_weights * np.log(event_likelihood))
     return nll_val
 
+# à partir des simulations 
+pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights)
+# minuit 
+nll_func = lambda mu: unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S, N_B)
 
+m = Minuit(nll_func, mu=1.0)
+m.limits["mu"] = (0, None)
+m.errordef = Minuit.LIKELIHOOD
+m.migrad() 
+m.hesse()  
+# résultats 
+print("mu_hat =", m.values["mu"])
+print("sigma_mu =", m.errors["mu"])
+print("NLL_min =", m.fval)
 
 # PLOTS 
 
