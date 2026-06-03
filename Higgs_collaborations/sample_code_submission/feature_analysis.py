@@ -1,6 +1,13 @@
 import sys
 from pathlib import Path
 import os
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.inspection import permutation_importance
+from scipy.stats import chisquare
+from HiggsML.datasets import download_dataset, Data
+from HiggsML.systematics import systematics
+from matplotlib.font_manager import FontProperties
 
 # Ensure the package containing HiggsML is on sys.path so we can import HiggsML.datasets
 
@@ -45,20 +52,6 @@ def data_jet_two(data):
     # We keep all the rows where the value of "PRI_n_jets" is 2 
     data_jet_two = data[data["PRI_n_jets"] == 2]
     return data_jet_two
-
-from sklearn.metrics import accuracy_score
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import os
-import sys
-from sklearn.model_selection import train_test_split
-from sklearn.inspection import permutation_importance
-from scipy.stats import chisquare
-from HiggsML.datasets import download_dataset, Data
-from HiggsML.systematics import systematics
-import numpy as np
-from matplotlib.font_manager import FontProperties
 
 def feature_corrilations(data):
     
@@ -106,13 +99,6 @@ feature_corrilations(data_jet_one(data_set))
 feature_corrilations(data_jet_zero(data_set))
 feature_corrilations(data_jet_two(data_set))
    
-    
-
-
-
-
-
-
 print(data_set.columns)
 # print(data_set["detailed_labels"])
 # print(data_set["weights"])
@@ -354,8 +340,8 @@ if __name__ == "__main__":
     feature_corrilations(data_set)
 
 
-# matrix_line = feature_signal_background_correlations(data_set)
-# matrix_square = feature_corrilations(data_set)
+matrix_line = feature_signal_background_correlations(data_set)
+matrix_square = feature_corrilations(data_set)
 
 def value_signal(data_set, lst):
     
