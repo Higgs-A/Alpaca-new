@@ -164,7 +164,7 @@ m.hesse()   # calcul des erreurs
 #résultats
 print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
 print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
-print("NLL_min =", m.fval)) # valeur minimale de NLL3
+print("NLL_min =", m.fval) # valeur minimale de NLL3
 
 
 
@@ -313,47 +313,6 @@ def plot_binned_histograms(N_obs, S, B, mu_hat, N_bins=5, plot_show=True):
     plt.tight_layout()
     if plot_show: plt.show()
 
-
-def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
-    '''Plot likelihood for unbinned data (Task 1b)'''
-    def neg_ll(mu):
-        return unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp)
-
-    mu_vals_full = np.linspace(0, 5, 1000)
-    nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
-    nll_min = np.min(nll_vals_full)
-    delta_nll_full = nll_vals_full - nll_min
-
-    mask = delta_nll_full < 20
-    mu_vals = mu_vals_full[mask]
-    delta_nll = delta_nll_full[mask]
-
-    left_mask = mu_vals < mu_hat
-    right_mask = mu_vals > mu_hat
-
-    try:
-        from scipy.interpolate import interp1d
-        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
-        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
-        mu_lower = float(left_interp(0.5))
-        mu_upper = float(right_interp(0.5))
-        delta_mu = mu_upper - mu_lower
-    except Exception as e:
-        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
-        print("Interpolation error:", e)
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(mu_vals, delta_nll, label=r"Unbinned $\Delta$NLL", color="#8B008B")
-    plt.axvline(mu_hat, color="red", linestyle="--", label=rf"Unbinned $\hat\mu = {mu_hat:.3f}$")
-    plt.axvline(mu_lower, color="green", linestyle="--", label=rf"Unbinned $\mu_{{-1\sigma}} = {mu_lower:.3f}$")
-    plt.axvline(mu_upper, color="green", linestyle="--", label=rf"Unbinned $\mu_{{+1\sigma}} = {mu_upper:.3f}$")
-    plt.xlabel(r"$\mu$")
-    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
-    plt.title(rf"Profile Unbinned Likelihood: $\delta\mu$ = {delta_mu:.3f}")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    if plot_show: plt.show()
 
 
 def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
