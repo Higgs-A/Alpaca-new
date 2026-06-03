@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from sklearn.model_selection import KFold
-from boosted_decision_tree import XGBoost
+from boosted_decision_tree import XGBoost_BDT
 from get_data import get_clean_splits
 
 
@@ -75,7 +75,7 @@ def grid_search_ams_and_threshold(X_train, y_train, weights_train):
                 w_val_fold *= n_splits
                 
                 # Modèle
-                test_model = XGBoost()
+                test_model = XGBoost_BDT()
                 test_model.model.set_params(learning_rate=lr, early_stopping_rounds=stopping)
                 test_model.fit(X_tr_fold, y_tr_fold, weights=w_tr_fold)
                 

@@ -5,9 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import KFold
-
-# Imports de tes classes et fonctions locales
-from boosted_decision_tree import XGBoost
+from boosted_decision_tree import XGBoost_BDT
 from get_data import get_clean_splits
 
 
@@ -47,7 +45,7 @@ def optimize_learning_rate(X_train, y_train, weights_train):
             w_val_fold *= n_splits 
             
             # Instanciation d'un modèle vierge
-            test_model = XGBoost()
+            test_model = XGBoost_BDT()
             
             # Injection dynamique du learning rate dans le sous-modèle XGBoost
             test_model.model.set_params(learning_rate=lr)
