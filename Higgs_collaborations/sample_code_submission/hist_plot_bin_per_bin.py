@@ -3,6 +3,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
+<<<<<<< HEAD
+=======
+from sklearn.model_selection import train_test_split
+>>>>>>> 7219bc3 (essai de variation bkg (sans le dataset))
 
 # Importations de vos fichiers locaux
 from model import Model
@@ -14,7 +18,11 @@ from systematic_analysis import tes_fitter, jes_fitter
 # ==============================================================================
 
 def visualiser_impact_tes(model, training_dict):
+<<<<<<< HEAD
     tes_values = np.linspace(0.97, 1.03, 7)
+=======
+    tes_values = np.linspace(0.9, 1.0, 10)
+>>>>>>> 7219bc3 (essai de variation bkg (sans le dataset))
     
     # Grille 2x3 : 3 plots en haut, 2 en bas pour les différences
     fig = plt.figure(figsize=(20, 12))
@@ -48,7 +56,11 @@ def visualiser_impact_tes(model, training_dict):
 # ==============================================================================
 
 def visualiser_impact_tes(model, training_dict):
+<<<<<<< HEAD
     tes_values = np.linspace(0.97, 1.03, 15)  # Plus de points pour une courbe plus lisse
+=======
+    tes_values = np.linspace(0.7, 1.3, 30)  # Plus de points pour une courbe plus lisse
+>>>>>>> 7219bc3 (essai de variation bkg (sans le dataset))
     num_bins = 6
     
     fig = plt.figure(figsize=(20, 12))
@@ -147,7 +159,11 @@ def visualiser_impact_tes(model, training_dict):
     
 
 # ==============================================================================
+<<<<<<< HEAD
 # ZONE 2 : CHARGEMENT DES DONNÉES (VOTRE STRUCTURE DE DOSSIERS)
+=======
+# ZONE 2 : CHARGEMENT DES DONNÉES 
+>>>>>>> 7219bc3 (essai de variation bkg (sans le dataset))
 # ==============================================================================
 
 print("Localisation et chargement des données...")
@@ -155,10 +171,31 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(os.path.dirname(script_dir))
 data_path = os.path.join(root_dir, "blackSwan_data", "blackSwan_data.parquet")
 
+<<<<<<< HEAD
 df_complet = pd.read_parquet(data_path)
 
 def get_train_set_custom(selected_indices):
     return df_complet.iloc[selected_indices].copy()
+=======
+# 1. On charge tout
+df_complet = pd.read_parquet(data_path)
+
+# 2. On divise le dataset en Train (80%) et Eval (20%)
+# L'utilisation d'un random_state garantit que la séparation sera toujours la même
+df_train, df_eval = train_test_split(df_complet, test_size=0.20, random_state=42) #on est pas obligés de garder le random state, mais ça peut aider à la reproductibilité et au debug 
+
+# 3. Fonction pour le wrapper (qui ne tire QUE dans df_train)
+def get_train_set_custom(selected_indices):
+    return df_train.iloc[selected_indices].copy()
+
+# 4. On prépare le dictionnaire d'évaluation que tu vas envoyer à tes fitters
+# La fonction systematics() s'attend souvent à un dictionnaire avec "data", "labels", "weights"
+eval_dict = {
+    "data": df_eval.drop(columns=["labels", "weights", "detailed_labels"], errors='ignore'),
+    "labels": df_eval["labels"].values,
+    "weights": df_eval["weights"].values
+}
+>>>>>>> 7219bc3 (essai de variation bkg (sans le dataset))
 
 # ==============================================================================
 # ZONE 3 : INITIALISATION ET EXÉCUTION
@@ -168,6 +205,7 @@ print("Initialisation du pipeline...")
 mon_wrapper = Model(
     get_train_set=get_train_set_custom,
     systematics=systematics,
+<<<<<<< HEAD
     # model_type="sample_model"
     model_type = "BDT"
 )
@@ -184,6 +222,23 @@ print("Calcul de la paramétrisation TES...")
 transformateur_tes = tes_fitter(
     model=mon_wrapper.model,
     train_set=mon_wrapper.training_set
+=======
+    model_type="BDT"
+)
+
+print("Entraînement du modèle")
+mon_wrapper.fit()
+
+# LANCEMENT DE LA VISUALISATION (SUR LES 20% RESTANTS)
+print("Génération des graphiques multi-shifts (sur l'Eval Set)...")
+visualiser_impact_tes(mon_wrapper.model, eval_dict)
+
+# APPEL DES FITTERS (SUR LES 20% RESTANTS)
+print("Calcul de la paramétrisation TES (sur l'Eval Set)...")
+transformateur_tes = tes_fitter(
+    model=mon_wrapper.model,
+    train_set=eval_dict  
+>>>>>>> 7219bc3 (essai de variation bkg (sans le dataset))
 )
 print("Analyse terminée.")
 
