@@ -377,3 +377,74 @@ def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp
     plt.grid(True)
     plt.tight_layout()
     if plot_show: plt.show()
+
+
+
+
+
+
+
+#Task 2: on ne travaille qu'avec une méthode binned pour l'instant
+
+def likelihood_fit_mu_tes_jes(
+    n_obs,
+    f,
+    g,
+    tes_min,
+    tes_max,
+    jes_min,
+    jes_max,
+):
+#f et g sont sous la forme d'un tableau de fonctions évaluées dans les bins, par exemple f[i](tes) donne la valeur de la fonction f pour le bin i et une valeur de tes. De même pour g[i](jes).
+#n-obs: tableau des nombres d'observations dans les bins, par exemple n_obs[i] donne le nombre d'observations dans le bin i.
+# tes_min et tes_max sont les limites de tes, jes_min et jes_max sont les limites de jes. Ces limites seront utilisées pour contraindre les paramètres tes et jes lors de l'optimisation avec Minuit.
+    n_bins = len(n_obs)
+
+    def NLL(mu, tes, jes):
+
+        nll = 0.0
+
+        for i in range(n_bins):
+
+            gamma_i = f[i](tes)
+
+            beta_i = g[i](jes)
+
+            lambda_i = mu * gamma_i + beta_i
+
+            lambda_i = max(lambda_i, 1e-10)
+
+            nll -= (
+                n_obs[i] * np.log(lambda_i)
+                - lambda_i
+            )
+
+        return nll
+
+    m = Minuit(
+        NLL,
+        mu=1.0,
+        tes=1.0,
+        jes=1.0,
+    )
+
+    m.limits["mu"] = (0, None)
+
+    m.limits["tes"] = (tes_min, tes_max)
+
+    m.limits["jes"] = (jes_min, jes_max)
+
+    m.errordef = Minuit.LIKELIHOOD
+
+    m.migrad()
+    m.hesse()
+
+    return {
+        "mu": m.values["mu"],
+        "mu_err": m.errors["mu"],
+        "tes": m.values["tes"],
+        "tes_err": m.errors["tes"],
+        "jes": m.values["jes"],
+        "jes_err": m.errors["jes"],
+        "nll_min": m.fval,
+    }
