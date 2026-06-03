@@ -2,6 +2,8 @@ from kiwisolver import strength
 import numpy as np
 from HiggsML.systematics import systematics
 from iminuit import Minuit
+from scipy.stats import gaussian_kde
+import matplotlib.pyplot as plt
 
 """
 Task 1a : Counting Estimator
@@ -49,6 +51,35 @@ def compute_mu(score, weight, saved_info):
         "del_mu_sys": del_mu_sys,
         "del_mu_tot": del_mu_tot,
     }
+    
+def compute_mu_unbinned_likelihood(mu0, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
+    '''
+    Estimate mu by minimizing the NLL using Minuit and unbinned data
+    '''
+    pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights) 
+    nll_func = lambda mu: unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S, N_B)
+    m = Minuit(nll_func, mu=1.0)
+    m.limits["mu"] = (0, None)
+    m.errordef = Minuit.LIKELIHOOD
+    m.migrad() 
+    m.hesse()  
+    print("mu_hat =", m.values["mu"])
+    print("sigma_mu =", m.errors["mu"])
+    print("NLL_min =", m.fval)
+
+def compute_mu_binned_likelihood(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
+    '''
+    Estimate mu by minimizing the NLL using Minuit and bins
+    '''
+    Nb, Sb, Bb = prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights)
+    m = Minuit(lambda mu: NLL(mu, Nb, Sb, Bb), mu=mu0) #mu est le paramètre à estimer, initialisé à mu0 
+    m.errordef = Minuit.LIKELIHOOD # on minimise NLL
+    m.migrad()  # recherche du minimum
+    m.hesse()   # calcul des erreurs
+    print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
+    print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
+    print("NLL_min =", m.fval) # valeur minimale de NLL3
+    
 
 def calculate_saved_info(model, holdout_set):
 
@@ -104,16 +135,8 @@ def calculate_saved_info(model, holdout_set):
 
     print("saved_info", saved_info)
 
-# TASK 1B : Stat-Only Likelihood Estimator
 
-#BINNED version : 
 
-# N, S et B sont déjà définis et "fixes" dans le contexte de cette analyse 
-# N : nombre d'événements observés
-# S : nombre d'événements attendus du signal pour mu=1
-# B : nombre d'événements attendus du background
-
-N_bins = 5
 def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
     '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
     # bin boundaries between 0 and 1
@@ -133,20 +156,8 @@ def NLL(mu, N, S, B):
     nll_val = np.sum(expected - N * np.log(expected))
     return nll_val
 
-#minuit
-m = Minuit(lambda mu: NLL(mu, N, S, B), mu=1.0) #mu est le paramètre à estimer, initialisé à 1.0 (les autres paramètres sont fixés)
-m.errordef = Minuit.LIKELIHOOD # on minimise NLL
-m.migrad()  # recherche du minimum
-m.hesse()   # calcul des erreurs
-#résultats
-print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
-print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
-print("NLL_min =", m.fval)) # valeur minimale de NLL3
 
 
-
-# UNBINNED version : 
-from scipy.stats import gaussian_kde
 
 def prepare_unbinned(S_scores, S_weights, B_scores, B_weights):
     #création des PDFs continues grâce aux scores et poids des simulations
@@ -171,25 +182,9 @@ def unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp):
     nll_val = N_expected_total - np.sum(Data_weights * np.log(event_likelihood))
     return nll_val
 
-# à partir des simulations 
-pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights)
-# minuit 
-nll_func = lambda mu: unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S, N_B)
-
-m = Minuit(nll_func, mu=1.0)
-m.limits["mu"] = (0, None)
-m.errordef = Minuit.LIKELIHOOD
-m.migrad() 
-m.hesse()  
-# résultats 
-print("mu_hat =", m.values["mu"])
-print("sigma_mu =", m.errors["mu"])
-print("NLL_min =", m.fval)
-
 
 
 # PLOTS 
-import matplotlib.pyplot as plt
 
 def plot_likelihood(n_obs, S, B, mu_hat, plot_show=True):
     '''Plot likelihood for Task 1a'''
