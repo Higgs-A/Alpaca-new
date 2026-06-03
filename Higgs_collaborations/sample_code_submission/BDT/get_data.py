@@ -1,5 +1,6 @@
 from sklearn.model_selection import train_test_split
 from HiggsML.datasets import download_dataset
+import joblib
 
 def get_clean_splits():
     """
@@ -13,7 +14,6 @@ def get_clean_splits():
     data = download_dataset("blackSwan_data")
     data.load_train_set()
     data_set = data.get_train_set()
-
     # 2. Extraction brute des colonnes cibles et nettoyage de X
     y = data_set["labels"]
     w = data_set["weights"]
@@ -23,6 +23,5 @@ def get_clean_splits():
     X_train, X_test, y_train, y_test, w_train, w_test = train_test_split(
         X, y, w, test_size=0.20, random_state=42, stratify=y
     )
-
     # On renvoie les 6 blocs de données d'un coup
     return X_train, X_test, y_train, y_test, w_train, w_test

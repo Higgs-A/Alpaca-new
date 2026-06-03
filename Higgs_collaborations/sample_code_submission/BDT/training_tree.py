@@ -28,36 +28,38 @@ def training_tree(model_class=None, model_path=None):
             print("Erreur : veuillez taper 'xgb' ou 'lgbm'.")
 
     if model_path is None:
-        model_name = model_class.__name__.lower() # ex: 'xgboost_bdt'
-        model_path = f"{model_name}_model.joblib"
-    
-    # 1. Récupération des données
+        model_path = f"{model_class.__name__}_checkpoint.joblib"
+
+    # 1. Chargement si le checkpoint existe
+    if os.path.exists(model_path):
+        reponse = input(f"Checkpoint trouvé : {model_path}. Charger ? (o/n) : ").lower()
+        if reponse == 'o':
+            print(f"Chargement du contexte complet depuis {model_path}...")
+            cp = joblib.load(model_path)
+            return cp['X_train'], cp['X_test'], cp['y_train'], cp['y_test'], \
+                   cp['w_train'], cp['w_test'], cp['model'], cp['predictions']
+
+    # 2. Sinon : Entraînement complet
+    print("Début de la récupération des données et entraînement...")
     X_train, X_test, y_train, y_test, w_train, w_test = get_clean_splits()
     
-    # 2. Logique de chargement ou d'entraînement
-    if os.path.exists(model_path):
-        reponse = input(f"Un modèle de type {model_class.__name__} existe ({model_path}). Voulez-vous l'utiliser ? (o/n) : ").lower()
-        if reponse == 'o':
-            print(f"Chargement de {model_path}...")
-            bdt = joblib.load(model_path)
-        else:
-            bdt = train_new_model(model_class, X_train, y_train, w_train, model_path)
-    else:
-        print(f"Aucun modèle trouvé pour {model_class.__name__}.")
-        bdt = train_new_model(model_class, X_train, y_train, w_train, model_path)
-
-    # 3. Évaluation
-    predictions = bdt.predict(X_test)
-    return bdt, predictions, y_test, w_test
-
-def train_new_model(model_class, X_train, y_train, w_train, model_path):
-    # Ici, on instancie dynamiquement la classe passée en argument
-    bdt = model_class() 
-    print(f"[*] Début de l'entraînement avec {model_class.__name__}...")
+    bdt = model_class()
     bdt.fit(X_train, y_train, weights=w_train)
-    joblib.dump(bdt, model_path)
-    print(f"Modèle sauvegardé sous : {model_path}")
-    return bdt
+    predictions = bdt.predict(X_test)
+
+    # 3. Sauvegarde du contexte complet
+    checkpoint = {
+        'model': bdt,
+        'X_train': X_train, 'X_test': X_test,
+        'y_train': y_train, 'y_test': y_test,
+        'w_train': w_train, 'w_test': w_test,
+        'predictions': predictions
+    }
+    joblib.dump(checkpoint, model_path)
+    print(f"Checkpoint complet sauvegardé sous : {model_path}")
+    
+    return X_train, X_test, y_train, y_test, w_train, w_test, bdt, predictions
+
 
 if __name__ == "__main__":
     training_tree()

@@ -32,6 +32,12 @@ def amsasimov(s_in, b_in):
     else:
         return ams
 
+def simple_significance(s_in, b_in):
+    """Calcule la significativité Z = S / sqrt(B)"""
+    # On ajoute un epsilon pour éviter la division par zéro
+    b = np.where(b_in <= 0, 1e-10, b_in)
+    return s_in / np.sqrt(b)
+
 
 def significance_vscore(y_true, y_score, sample_weight=None):
     """Calcule le vecteur de signification Z selon le seuil de coupure"""
@@ -50,13 +56,12 @@ def significance_vscore(y_true, y_score, sample_weight=None):
     s_cumul = np.cumsum(s_hist[::-1])[::-1]
     b_cumul = np.cumsum(b_hist[::-1])[::-1]
 
-    return amsasimov(s_cumul, b_cumul)
-
+    return amsasimov(s_cumul, b_cumul), simple_significance(s_cumul, b_cumul)
 
 def significance_score(y_true, y_score, sample_weight=None):
     """Retourne la signification maximale trouvée (Z max)"""
-    vsig = significance_vscore(y_true, y_score, sample_weight)
-    return np.max(vsig)
+    z_ams, _ = significance_vscore(y_true, y_score, sample_weight)
+    return np.max(z_ams)
 
 
 def get_model_choice():
@@ -71,8 +76,8 @@ model_class = get_model_choice()
 
 # --- 1. COURBE ROC AUC ---
 if __name__ == "__main__":
-    y_pred_test=training_tree(model_class=model_class)[1]
-    X_train, X_test,y_train, y_test, w_train,weights_test_arr=get_clean_splits()
+
+    X_train, X_test,y_train, y_test, w_train,weights_test_arr,bdt, y_pred_test=training_tree(model_class=model_class)
 
     model_name = model_class.__name__.replace("_BDT", "")
 
@@ -98,22 +103,22 @@ if __name__ == "__main__":
     plt.show()
 
     # --- 2. COURBE DE SIGNIFICATIVITÉ ---
-    plt.figure(figsize=(8, 6))
-    vamsasimov_res = significance_vscore(
-        y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
-    )
+    
+    vams, vsimple = significance_vscore(y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr)
+    
     significance_max = significance_score(
         y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
     )
+    x_thresholds = np.linspace(0, 1, num=len(vams))
 
-    x_thresholds = np.linspace(0, 1, num=len(vamsasimov_res))
-
-    plt.plot(x_thresholds, vamsasimov_res, color="darkgreen", lw=2, 
-             label=f"{model_name} (Z max = {significance_max:.2f})"
+    plt.figure(figsize=(8, 6))
+    plt.plot(x_thresholds, vams, color="darkgreen", lw=2,label=f"{model_name} (Z max = {significance_max:.2f})"
              )
-    plt.title("BDT Significance vs Threshold")
+    plt.plot(x_thresholds, vsimple, color="red", lw=2, linestyle="--", label=f"{model_name} - Z = S/sqrt(B)")
+    
+    plt.title("Comparaison : AMS vs Z = S/sqrt(B)")
     plt.xlabel("Threshold")
-    plt.ylabel("Significance (Z)")
+    plt.ylabel("Significance")
     plt.legend(loc="best")
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.show()
