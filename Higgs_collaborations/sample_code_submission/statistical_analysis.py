@@ -135,7 +135,7 @@ def calculate_saved_info(model, holdout_set):
 
     print("saved_info", saved_info)
 
-
+N_bins = 5
 
 def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
     '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
