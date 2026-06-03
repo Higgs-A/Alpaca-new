@@ -6,6 +6,37 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score, roc_curve
 
+
+######################################################by beta: foctions pour plots des histograms
+
+def plot_given_hist(hist1:np.histogram, hist2:np.histogram, tes:float):
+    """
+    Trace un histogramme directement à partir d'un tableau de comptes (ex: nom_hist).
+    """
+    # 1. On crée l'axe X (les 100 bins répartis entre 0 et 1)
+    bin_edges_1 = np.linspace(0, 1, len(hist1) + 1)
+    bin_centers_1 = (bin_edges_1[:-1] + bin_edges_1[1:]) / 2
+    bin_edges_2 = np.linspace(0, 1, len(hist2) + 1)
+    bin_centers_2 = (bin_edges_2[:-1] + bin_edges_2[1:]) / 2
+    
+    plt.figure(figsize=(8, 5))
+    
+    # 2. On trace les barres
+    plt.bar(bin_centers_1, hist1, width=1/len(hist1), color='red', alpha=0.7, edgecolor='black', label ='signal')
+    plt.bar(bin_centers_2, hist2, width=1/len(hist2), color='blue', alpha=0.7, edgecolor='black', label='background')
+    # 3. Habillage rapide
+    plt.xlabel('Bins (score)')
+    plt.ylabel('Événements')
+    plt.title(f'Visualisation de la repartission des évènements en fonctions des scores {tes}')
+    plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+    #legende
+    plt.legend()
+
+    
+    plt.show()
+
+
+
 log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 
 
