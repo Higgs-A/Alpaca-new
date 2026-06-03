@@ -185,3 +185,4 @@ m.hesse()
 print("mu_hat =", m.values["mu"])
 print("sigma_mu =", m.errors["mu"])
 print("NLL_min =", m.fval)
+
