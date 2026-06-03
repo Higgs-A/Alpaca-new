@@ -2,8 +2,6 @@ from kiwisolver import strength
 import numpy as np
 from HiggsML.systematics import systematics
 from iminuit import Minuit
-from scipy.stats import gaussian_kde
-import matplotlib.pyplot as plt
 
 """
 Task 1a : Counting Estimator
@@ -51,35 +49,6 @@ def compute_mu(score, weight, saved_info):
         "del_mu_sys": del_mu_sys,
         "del_mu_tot": del_mu_tot,
     }
-    
-def compute_mu_unbinned_likelihood(mu0, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
-    '''
-    Estimate mu by minimizing the NLL using Minuit and unbinned data
-    '''
-    pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights) 
-    nll_func = lambda mu: unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S, N_B)
-    m = Minuit(nll_func, mu=1.0)
-    m.limits["mu"] = (0, None)
-    m.errordef = Minuit.LIKELIHOOD
-    m.migrad() 
-    m.hesse()  
-    print("mu_hat =", m.values["mu"])
-    print("sigma_mu =", m.errors["mu"])
-    print("NLL_min =", m.fval)
-
-def compute_mu_binned_likelihood(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
-    '''
-    Estimate mu by minimizing the NLL using Minuit and bins
-    '''
-    Nb, Sb, Bb = prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights)
-    m = Minuit(lambda mu: NLL(mu, Nb, Sb, Bb), mu=mu0) #mu est le paramètre à estimer, initialisé à mu0 
-    m.errordef = Minuit.LIKELIHOOD # on minimise NLL
-    m.migrad()  # recherche du minimum
-    m.hesse()   # calcul des erreurs
-    print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
-    print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
-    print("NLL_min =", m.fval) # valeur minimale de NLL3
-    
 
 def calculate_saved_info(model, holdout_set):
 
@@ -135,8 +104,16 @@ def calculate_saved_info(model, holdout_set):
 
     print("saved_info", saved_info)
 
-N_bins = 5
+# TASK 1B : Stat-Only Likelihood Estimator
 
+#BINNED version : 
+
+# N, S et B sont déjà définis et "fixes" dans le contexte de cette analyse 
+# N : nombre d'événements observés
+# S : nombre d'événements attendus du signal pour mu=1
+# B : nombre d'événements attendus du background
+
+N_bins = 5
 def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, Data_scores, Data_weights):
     '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
     # bin boundaries between 0 and 1
@@ -156,8 +133,20 @@ def NLL(mu, N, S, B):
     nll_val = np.sum(expected - N * np.log(expected))
     return nll_val
 
+#minuit
+m = Minuit(lambda mu: NLL(mu, N, S, B), mu=1.0) #mu est le paramètre à estimer, initialisé à 1.0 (les autres paramètres sont fixés)
+m.errordef = Minuit.LIKELIHOOD # on minimise NLL
+m.migrad()  # recherche du minimum
+m.hesse()   # calcul des erreurs
+#résultats
+print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
+print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
+print("NLL_min =", m.fval)) # valeur minimale de NLL3
 
 
+
+# UNBINNED version : 
+from scipy.stats import gaussian_kde
 
 def prepare_unbinned(S_scores, S_weights, B_scores, B_weights):
     #création des PDFs continues grâce aux scores et poids des simulations
@@ -182,176 +171,77 @@ def unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp):
     nll_val = N_expected_total - np.sum(Data_weights * np.log(event_likelihood))
     return nll_val
 
+# à partir des simulations 
+pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights)
+# minuit 
+nll_func = lambda mu: unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S, N_B)
+
+m = Minuit(nll_func, mu=1.0)
+m.limits["mu"] = (0, None)
+m.errordef = Minuit.LIKELIHOOD
+m.migrad() 
+m.hesse()  
+# résultats 
+print("mu_hat =", m.values["mu"])
+print("sigma_mu =", m.errors["mu"])
+print("NLL_min =", m.fval)
 
 
-# PLOTS 
 
-def plot_likelihood(n_obs, S, B, mu_hat, plot_show=True):
-    '''Plot likelihood for Task 1a'''
-    def neg_ll(mu):
-        lam = mu * S + B
+#Task 2
+
+#Test pour être sûr des types de tes_fit et jes_fit
+'''
+tes_fit = tes_fitter(model, holdout_set)
+ 
+print(type(tes_fit))
+ 
+print(tes_fit(1.0))
+ 
+jes_fit = jes_fitter(model, holdout_set)
+ 
+print(type(jes_fit))
+ 
+print(jes_fit(1.0))
+ 
+'''
+
+# On suppose que tes_fit et jes_fit sont des fonctions qui prennent en entrée une valeur de tes ou jes et retournent les paramètres beta et gamma correspondants.
+def likelihood_fit_mu_tes_jes(
+    n_obs,
+    tes_fit,
+    jes_fit,
+    mu_init=1.0,
+    tes_init=1.0,
+    jes_init=1.0,
+): # n_obs : nombre d'événements observés, tes_fit et jes_fit : fonctions de fit pour tes et jes, mu_init, tes_init, jes_init : valeurs initiales pour mu, tes et jes
+
+    def neg_ll(mu, tes, jes): # fonction de vraisemblance log neg, qui prend en entrée les paramètres mu, tes et jes
+
+        beta_tes, gamma_tes = tes_fit(tes) # on récupère les paramètres beta et gamma à partir de tes_fit
+        beta_jes, gamma_jes = jes_fit(jes) # on récupère les paramètres beta et gamma à partir de jes_fit
+
+        beta = beta_tes + beta_jes
+        gamma = gamma_tes + gamma_jes
+
+        lam = mu * gamma + beta
+
         lam = np.clip(lam, 1e-10, None)
+
         return -(n_obs * np.log(lam) - lam)
 
-    mu_vals_full = np.linspace(0, 5, 1000)
-    nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
-    nll_min = np.min(nll_vals_full)
-    delta_nll_full = nll_vals_full - nll_min
+    m = Minuit(
+        neg_ll,
+        mu=mu_init,
+        tes=tes_init,
+        jes=jes_init,
+    )
 
-    mask = delta_nll_full < 20
-    mu_vals = mu_vals_full[mask]
-    delta_nll = delta_nll_full[mask]
+    m.limits["mu"] = (0, None)
 
-    left_mask = mu_vals < mu_hat
-    right_mask = mu_vals > mu_hat
+    m.errordef = Minuit.LIKELIHOOD
 
-    try:
-        from scipy.interpolate import interp1d
-        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
-        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
-        mu_lower = float(left_interp(0.5))
-        mu_upper = float(right_interp(0.5))
-        delta_mu = mu_upper - mu_lower
-    except Exception as e:
-        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
-        print("Interpolation error:", e)
+    m.migrad()
+    m.hesse()
 
-    plt.figure(figsize=(8, 5))
-    plt.plot(mu_vals, delta_nll, label=r"Single Binned $\Delta$NLL", color="blue")
-    plt.axvline(mu_hat, color="red", linestyle="--", label=rf"Single Binned $\hat\mu = {mu_hat:.3f}$")
-    plt.axvline(mu_lower, color="green", linestyle="--", label=rf"Single Binned $\mu_{{-1\sigma}} = {mu_lower:.3f}$")
-    plt.axvline(mu_upper, color="green", linestyle="--", label=rf"Single Binned $\mu_{{+1\sigma}} = {mu_upper:.3f}$")
-    plt.xlabel(r"$\mu$")
-    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
-    plt.title(rf"Single Binned Profile Likelihood: $\delta\mu$ = {delta_mu:.3f}")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    if plot_show: plt.show()
-
-
-def plot_binned_likelihood(N_obs, S, B, mu_hat, plot_show=True):
-    '''NLL pour la méthode binned Task 1b'''
-    def neg_ll(mu):
-        return NLL(mu, N_obs, S, B)
-
-    mu_vals_full = np.linspace(0, 5, 1000)
-    nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
-    nll_min = np.min(nll_vals_full)
-    delta_nll_full = nll_vals_full - nll_min
-
-    mask = delta_nll_full < 20
-    mu_vals = mu_vals_full[mask]
-    delta_nll = delta_nll_full[mask]
-
-    left_mask = mu_vals < mu_hat
-    right_mask = mu_vals > mu_hat
-
-    try:
-        from scipy.interpolate import interp1d
-        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
-        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
-        mu_lower = float(left_interp(0.5))
-        mu_upper = float(right_interp(0.5))
-        delta_mu = mu_upper - mu_lower
-    except Exception as e:
-        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
-        print("Interpolation error:", e)
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(mu_vals, delta_nll, label=r"Binned $\Delta$NLL", color="#4A90E2")
-    plt.axvline(mu_hat, color="#D0021B", linestyle="--", label=rf"Binned $\hat\mu = {mu_hat:.3f}$")
-    plt.axvline(mu_lower, color="#50E3C2", linestyle="--", label=rf"Binned $\mu_{{-1\sigma}} = {mu_lower:.3f}$")
-    plt.axvline(mu_upper, color="#50E3C2", linestyle="--", label=rf"Binned $\mu_{{+1\sigma}} = {mu_upper:.3f}$")
-    plt.xlabel(r"$\mu$")
-    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
-    plt.title(rf"Profile Binned Likelihood: $\delta\mu$ = {delta_mu:.3f}")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    if plot_show: plt.show()
-
-
-def plot_binned_histograms(N_obs, S, B, mu_hat, N_bins=5, plot_show=True):
-    '''Binned histograms for Task 1b'''
-    plt.figure(figsize=(8, 5))
-    bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
-    width = bin_edges[1] - bin_edges[0]
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-    plt.bar(bin_centers, N_obs, width=width, alpha=0.5, label="Observed", edgecolor="black")
-    plt.step(bin_centers, B, where="mid", label="Background", color="orange")
-    plt.step(bin_centers, mu_hat * S + B, where="mid", label=f"Signal + Background (mu={mu_hat:.2f})", color="green")
-
-    plt.xlabel("Score")
-    plt.ylabel("Weighted Events")
-    plt.legend()
-    plt.grid(True)
-    plt.title("Binned Histogram: Observed vs Model Prediction")
-    plt.tight_layout()
-    if plot_show: plt.show()
-
-
-def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
-    '''Plot likelihood for unbinned data (Task 1b)'''
-    def neg_ll(mu):
-        return unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp)
-
-    mu_vals_full = np.linspace(0, 5, 1000)
-    nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
-    nll_min = np.min(nll_vals_full)
-    delta_nll_full = nll_vals_full - nll_min
-
-    mask = delta_nll_full < 20
-    mu_vals = mu_vals_full[mask]
-    delta_nll = delta_nll_full[mask]
-
-    left_mask = mu_vals < mu_hat
-    right_mask = mu_vals > mu_hat
-
-    try:
-        from scipy.interpolate import interp1d
-        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
-        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
-        mu_lower = float(left_interp(0.5))
-        mu_upper = float(right_interp(0.5))
-        delta_mu = mu_upper - mu_lower
-    except Exception as e:
-        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
-        print("Interpolation error:", e)
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(mu_vals, delta_nll, label=r"Unbinned $\Delta$NLL", color="#8B008B")
-    plt.axvline(mu_hat, color="red", linestyle="--", label=rf"Unbinned $\hat\mu = {mu_hat:.3f}$")
-    plt.axvline(mu_lower, color="green", linestyle="--", label=rf"Unbinned $\mu_{{-1\sigma}} = {mu_lower:.3f}$")
-    plt.axvline(mu_upper, color="green", linestyle="--", label=rf"Unbinned $\mu_{{+1\sigma}} = {mu_upper:.3f}$")
-    plt.xlabel(r"$\mu$")
-    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
-    plt.title(rf"Profile Unbinned Likelihood: $\delta\mu$ = {delta_mu:.3f}")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    if plot_show: plt.show()
-
-
-def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
-    '''plot for unbinned distributions (Task 1b) (smoothed shape)'''
-    plt.figure(figsize=(8, 5))
-    counts, bins, _ = plt.hist(Data_scores, bins=40, weights=Data_weights, alpha=0.3, label="Observed Data", color="gray", edgecolor="black")
-    
-    bin_width = bins[1] - bins[0]
-    x_plot = np.linspace(0, 1, 500)
-    
-    bkg_line = pdf_B(x_plot) * N_B_exp * bin_width
-    plt.plot(x_plot, bkg_line, label="Background", color="orange", lw=2)
-    
-    sig_bkg_line = (mu_hat * N_S_exp * pdf_S(x_plot) + N_B_exp * pdf_B(x_plot)) * bin_width
-    plt.plot(x_plot, sig_bkg_line, label=f"Signal + Background (mu={mu_hat:.2f})", color="green", lw=2)
-    
-    plt.xlabel("Score")
-    plt.ylabel("Events")
-    plt.title("Unbinned Distribution: Observed vs Model Prediction")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    if plot_show: plt.show()
+    return m.values["mu"], m.errors["mu"]
