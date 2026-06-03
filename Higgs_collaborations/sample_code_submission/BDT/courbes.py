@@ -63,6 +63,35 @@ def significance_score(y_true, y_score, sample_weight=None):
     z_ams, _ = significance_vscore(y_true, y_score, sample_weight)
     return np.max(z_ams)
 
+def plot_score_distribution(y_true, y_score, weights=None):
+    """
+    Affiche la distribution des scores de classification pour le Signal et le Bruit de fond.
+    """
+    if weights is None:
+        weights = np.ones(len(y_true))
+
+    # Séparation des scores selon la classe
+    signal_scores = y_score[y_true == 1]
+    background_scores = y_score[y_true == 0]
+    
+    signal_weights = weights[y_true == 1]
+    background_weights = weights[y_true == 0]
+
+    plt.figure(figsize=(10, 6))
+
+    # Histogrammes avec densité normalisée pour comparer les formes
+    plt.hist(background_scores, bins=50, weights=background_weights, 
+             color='red', alpha=0.4, label='Background', density=True)
+    plt.hist(signal_scores, bins=50, weights=signal_weights, 
+             color='blue', alpha=0.4, label='Signal', density=True)
+
+    plt.title("Score Distribution (Signal vs Background)")
+    plt.xlabel("Prediction Score")
+    plt.ylabel("Density")
+    plt.legend(loc='upper right')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.show()
+
 
 def get_model_choice():
     print("Sélection du modèle pour les courbes :")
@@ -74,13 +103,17 @@ def get_model_choice():
 
 model_class = get_model_choice()
 
-# --- 1. COURBE ROC AUC ---
+
 if __name__ == "__main__":
 
     X_train, X_test,y_train, y_test, w_train,weights_test_arr,bdt, y_pred_test=training_tree(model_class=model_class)
 
     model_name = model_class.__name__.replace("_BDT", "")
+# --- 1. COURBE SCORE ---
 
+    plot_score_distribution(y_test, y_pred_test, weights=weights_test_arr)
+
+# --- 2. COURBE ROC AUC ---
     plt.figure(figsize=(8, 6))
     auc_test = roc_auc_score(
         y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
@@ -102,7 +135,7 @@ if __name__ == "__main__":
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.show()
 
-    # --- 2. COURBE DE SIGNIFICATIVITÉ ---
+    # --- 3. COURBE DE SIGNIFICATIVITÉ ---
     
     vams, vsimple = significance_vscore(y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr)
     
@@ -123,7 +156,7 @@ if __name__ == "__main__":
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.show()
 
-    # --- 3. LEARNING CURVE ---
+    # --- 4. LEARNING CURVE ---
     # Utilisation de la logique de boucle manuelle sur les tailles pour intégrer votre classe
     train_sizes = [0.05, 0.1, 0.2, 0.5, 0.75, 1.0]
     ntrains = []
