@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
+from sklearn.model_selection import train_test_split
 
 # Importations de vos fichiers locaux
 from model import Model
@@ -147,7 +148,7 @@ def visualiser_impact_tes(model, training_dict):
     
 
 # ==============================================================================
-# ZONE 2 : CHARGEMENT DES DONNÉES (VOTRE STRUCTURE DE DOSSIERS)
+# ZONE 2 : CHARGEMENT DES DONNÉES 
 # ==============================================================================
 
 print("Localisation et chargement des données...")
@@ -155,10 +156,24 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(os.path.dirname(script_dir))
 data_path = os.path.join(root_dir, "blackSwan_data", "blackSwan_data.parquet")
 
+# 1. On charge tout
 df_complet = pd.read_parquet(data_path)
 
+# 2. On divise le dataset en Train (80%) et Eval (20%)
+# L'utilisation d'un random_state garantit que la séparation sera toujours la même
+df_train, df_eval = train_test_split(df_complet, test_size=0.20, random_state=42)
+
+# 3. Fonction pour le wrapper (qui ne tire QUE dans df_train)
 def get_train_set_custom(selected_indices):
-    return df_complet.iloc[selected_indices].copy()
+    return df_train.iloc[selected_indices].copy()
+
+# 4. On prépare le dictionnaire d'évaluation que tu vas envoyer à tes fitters
+# La fonction systematics() s'attend souvent à un dictionnaire avec "data", "labels", "weights"
+eval_dict = {
+    "data": df_eval.drop(columns=["labels", "weights", "detailed_labels"], errors='ignore'),
+    "labels": df_eval["labels"].values,
+    "weights": df_eval["weights"].values
+}
 
 # ==============================================================================
 # ZONE 3 : INITIALISATION ET EXÉCUTION
@@ -168,22 +183,21 @@ print("Initialisation du pipeline...")
 mon_wrapper = Model(
     get_train_set=get_train_set_custom,
     systematics=systematics,
-    # model_type="sample_model"
-    model_type = "BDT"
+    model_type="BDT"
 )
 
-print("Entraînement du modèle...")
+print("Entraînement du modèle")
 mon_wrapper.fit()
 
-# LANCEMENT DE VOTRE VISUALISATION
-print("Génération des graphiques multi-shifts...")
-visualiser_impact_tes(mon_wrapper.model, mon_wrapper.training_set)
+# LANCEMENT DE LA VISUALISATION (SUR LES 20% RESTANTS)
+print("Génération des graphiques multi-shifts (sur l'Eval Set)...")
+visualiser_impact_tes(mon_wrapper.model, eval_dict)
 
-# APPEL DE VOS FITTERS (POUR L'ÉQUIPE STAT)
-print("Calcul de la paramétrisation TES...")
+# APPEL DES FITTERS (SUR LES 20% RESTANTS)
+print("Calcul de la paramétrisation TES (sur l'Eval Set)...")
 transformateur_tes = tes_fitter(
     model=mon_wrapper.model,
-    train_set=mon_wrapper.training_set
+    train_set=eval_dict  # Attention au nom de l'argument dans ton fichier systematic_analysis.py
 )
 print("Analyse terminée.")
 
