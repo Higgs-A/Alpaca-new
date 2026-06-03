@@ -10,9 +10,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 from get_data import get_clean_splits
-from boosted_decision_tree import BoostedDecisionTree
 from training_tree import training_tree
-
+from boosted_decision_tree import XGBoost_BDT
+from LightGBM_BDT import LightGBM_BDT
+from Gradient_boosting_BDT import Sklearn_GBDT
 
 
 #Calcul de la signification maximale
@@ -58,12 +59,22 @@ def significance_score(y_true, y_score, sample_weight=None):
     return np.max(vsig)
 
 
+def get_model_choice():
+    print("Sélection du modèle pour les courbes :")
+    choix = input("Taper 'xgb' ou 'lgbm' ou 'sklearn' : ").lower()
+    if choix == 'xgb': return XGBoost_BDT
+    if choix == 'lgbm': return LightGBM_BDT
+    if choix == 'sklearn' : return Sklearn_GBDT
+    return XGBoost_BDT # Par défaut
 
+model_class = get_model_choice()
 
 # --- 1. COURBE ROC AUC ---
 if __name__ == "__main__":
-    y_pred_test=training_tree()[1]
+    y_pred_test=training_tree(model_class=model_class)[1]
     X_train, X_test,y_train, y_test, w_train,weights_test_arr=get_clean_splits()
+
+    model_name = model_class.__name__.replace("_BDT", "")
 
     plt.figure(figsize=(8, 6))
     auc_test = roc_auc_score(
@@ -73,9 +84,9 @@ if __name__ == "__main__":
         y_true=y_test, y_score=y_pred_test, sample_weight=weights_test_arr
     )
 
-    plt.plot(
-        fpr, tpr, color="darkgreen", lw=2, label="XGBoost Classe (AUC = {:.3f})".format(auc_test)
-    )
+    plt.plot(fpr, tpr, color="darkgreen", lw=2, 
+             label=f"{model_name} (AUC = {auc_test:.3f})")
+    
     plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -97,13 +108,9 @@ if __name__ == "__main__":
 
     x_thresholds = np.linspace(0, 1, num=len(vamsasimov_res))
 
-    plt.plot(
-        x_thresholds,
-        vamsasimov_res,
-        color="darkgreen",
-        lw=2,
-        label="XGBoost (Z max = {:.2f})".format(significance_max),
-    )
+    plt.plot(x_thresholds, vamsasimov_res, color="darkgreen", lw=2, 
+             label=f"{model_name} (Z max = {significance_max:.2f})"
+             )
     plt.title("BDT Significance vs Threshold")
     plt.xlabel("Threshold")
     plt.ylabel("Significance (Z)")
@@ -125,7 +132,7 @@ if __name__ == "__main__":
         ntrains.append(ntrain)
 
         # Ré-instanciation d'un modèle vierge à chaque étape de taille pour éviter les effets de mémoire
-        lc_model = BoostedDecisionTree()
+        lc_model = model_class() 
         
         # Entraînement partiel
         X_tr_sub = X_train.iloc[:ntrain] if isinstance(X_train, pd.DataFrame) else X_train[:ntrain]

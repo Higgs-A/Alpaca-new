@@ -3,7 +3,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler  # <-- AJOUTÉ : Pour la standardisation
 import numpy as np
 
-class BoostedDecisionTree:
+class XGBoost_BDT:
     """
     Classificateur XGBoost autonome pour le dataset Higgs.
     Intègre sa propre standardisation, l'early stopping et applique
