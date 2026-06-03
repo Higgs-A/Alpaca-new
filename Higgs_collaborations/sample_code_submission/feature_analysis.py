@@ -4,29 +4,21 @@ import os
 
 # Ensure the package containing HiggsML is on sys.path so we can import HiggsML.datasets
 
-#black_swan_pkg_path = r'c:\Users\geoff\Documents\Centrale\cours_centrale\ST4\EI\black_swan_pkg'
-#if black_swan_pkg_path not in sys.path:
-    #sys.path.insert(0, black_swan_pkg_path)
-#from HiggsML.datasets import download_dataset
+black_swan_pkg_path = r'c:\Users\geoff\Documents\Centrale\cours_centrale\ST4\EI\black_swan_pkg'
+if black_swan_pkg_path not in sys.path:
+    sys.path.insert(0, black_swan_pkg_path)
+from HiggsML.datasets import download_dataset
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
-from datasets import download_dataset
+# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
+# from datasets import download_dataset
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
 
+# Download dataset later (we change working dir first); keep this line commented to avoid duplicate downloads
 # data = download_dataset("blackSwan_data")
-# # Ensure a train set is loaded: Data.get_train_set() returns None until load_train_set() is called
-# try:
-#     data_set = data.get_train_set()
-#     if data_set is None:
-#         data.load_train_set()
-#         data_set = data.get_train_set()
-# except Exception as e:
-#     print("Error loading train set:", e)
-#     data_set = None
 
 # Changer vers le dossier du script pour télécharger les données localement
 os.chdir(os.path.dirname(__file__))
@@ -55,31 +47,30 @@ def feature_corrilations(data):
     #calcul of the matrix of correlation#
     corr_matrix = data_cleaned[feature_cols].corr()
     
-    # Debug: print shape to ensure it's 28x28 (or show actual shape)
-    # print(f"Number of features: {len(feature_cols)}")
-    # print(f"Correlation matrix shape: {corr_matrix.shape}")
-
-    # # Plot: wider but less tall figure to reduce vertical space
-    # plt.figure(figsize=(16, 10))
-    # annot_kws = {"size": 6}
-    # sns.heatmap(
-    #     corr_matrix,
-    #     annot=True,
-    #     fmt='.2f',
-    #     cmap='vlag',
-    #     center=0,
-    #     square=False,
-    #     xticklabels=True,
-    #     yticklabels=True,
-    #     annot_kws=annot_kws,
-    #     cbar_kws={"shrink": 0.6},
-    # )
-    # # Reduce tick label font size (feature titles) and rotate x labels for readability
-    # plt.xticks(fontsize=7, rotation=90)
-    # plt.yticks(fontsize=6, rotation=0)
-    # plt.title("Correlation matrix of features", fontsize=12)
-    # plt.tight_layout()
-    # plt.show()
+    # Debug: print np.shape to ensure it's 28x28 (or show actual shape)
+    print(f"Number of features: {len(feature_cols)}")
+    print(f"Correlation matrix shape: {corr_matrix.shape}")
+    # Plot: wider but less tall figure to reduce vertical space
+    plt.figure(figsize=(16, 10))
+    annot_kws = {"size": 6}
+    sns.heatmap(
+        corr_matrix,
+        annot=True,
+        fmt='.2f',
+        cmap='vlag',
+        center=0,
+        square=False,
+        xticklabels=True,
+        yticklabels=True,
+        annot_kws=annot_kws,
+        cbar_kws={"shrink": 0.6},
+    )
+    # Reduce tick label font size (feature titles) and rotate x labels for readability
+    plt.xticks(fontsize=7, rotation=90)
+    plt.yticks(fontsize=6, rotation=0)
+    plt.title("Correlation matrix of features", fontsize=12)
+    plt.tight_layout()
+    plt.show()
     return corr_matrix
     
    
@@ -154,9 +145,8 @@ def value_correlation(data_set, lst):
     return E
 
 def value(data_set, lst):
-    print("1")
     n=len(lst)
-    return value_signal(data_set, lst) - (2/n-1)*value_correlation(data_set, lst)
+    return value_signal(data_set, lst) - (2/(n-1))*value_correlation(data_set, lst)
         
     
 def best_features_set(data, n):
@@ -172,7 +162,6 @@ def best_features_set(data, n):
 
     return Score, combinaisons[indice_max]
 
-print(best_features_set(data_cleaned, 3))
 
 
 
@@ -202,3 +191,9 @@ def to_cartesian(data, particle_prefix):
     
     return df
 
+def conversion_numbers_into_names(score, indices):
+    feature_cols = [col for col in data_cleaned.columns if col.startswith('PRI_') or col.startswith('DER_')]
+    selected_features = [feature_cols[i] for i in indices]
+    return score, selected_features
+
+print(conversion_numbers_into_names(*best_features_set(data_cleaned, 24)))
