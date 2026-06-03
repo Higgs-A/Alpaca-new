@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from HiggsML.systematics import systematics
 
@@ -138,3 +139,4 @@ def bkg_fitter(model, eval_set, bkg_variations=np.array([0.95, 1.00, 1.05])):
         return np.clip(new_hist, 0, None)
 
     return fit_function
+
