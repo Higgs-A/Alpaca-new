@@ -31,6 +31,22 @@ data_set = data.get_train_set()
 target = data_set["labels"]
 data_cleaned = data_set.replace(-25, np.nan)
 
+def data_jet_one(data): 
+    # We keep all the rows where the value of "PRI_n_jets" is 1 but we keep all the columns, it's just take out some data
+    data_jet_one = data[data["PRI_n_jets"] == 1]
+    return data_jet_one
+
+def data_jet_zero(data):
+    # We keep all the rows where the value of "PRI_n_jets" is 0 
+    data_jet_zero = data[data["PRI_n_jets"] == 0]
+    return data_jet_zero
+
+def data_jet_two(data):
+    # We keep all the rows where the value of "PRI_n_jets" is 2 
+    data_jet_two = data[data["PRI_n_jets"] == 2]
+    return data_jet_two
+
+
 def feature_corrilations(data):
     
     
@@ -73,6 +89,9 @@ def feature_corrilations(data):
     plt.show()
     return corr_matrix
     
+feature_corrilations(data_jet_one(data_set))
+feature_corrilations(data_jet_zero(data_set))
+feature_corrilations(data_jet_two(data_set))
    
     
 
@@ -126,8 +145,8 @@ if __name__ == "__main__":
     feature_corrilations(data_set)
 
 
-matrix_line = feature_signal_background_correlations(data_set)
-matrix_square = feature_corrilations(data_set)
+# matrix_line = feature_signal_background_correlations(data_set)
+# matrix_square = feature_corrilations(data_set)
 
 def value_signal(data_set, lst):
     
@@ -146,7 +165,7 @@ def value_correlation(data_set, lst):
 
 def value(data_set, lst):
     n=len(lst)
-    return value_signal(data_set, lst) - (2/(n-1))*value_correlation(data_set, lst)
+    return 3*value_signal(data_set, lst) - (2/(n-1))*value_correlation(data_set, lst)
         
     
 def best_features_set(data, n):
@@ -196,4 +215,4 @@ def conversion_numbers_into_names(score, indices):
     selected_features = [feature_cols[i] for i in indices]
     return score, selected_features
 
-print(conversion_numbers_into_names(*best_features_set(data_cleaned, 24)))
+
