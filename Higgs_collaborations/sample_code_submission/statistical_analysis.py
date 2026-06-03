@@ -156,6 +156,15 @@ def NLL(mu, N, S, B):
     nll_val = np.sum(expected - N * np.log(expected))
     return nll_val
 
+#minuit
+m = Minuit(lambda mu: NLL(mu, N, S, B), mu=1.0) #mu est le paramètre à estimer, initialisé à 1.0 (les autres paramètres sont fixés)
+m.errordef = Minuit.LIKELIHOOD # on minimise NLL
+m.migrad()  # recherche du minimum
+m.hesse()   # calcul des erreurs
+#résultats
+print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
+print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
+print("NLL_min =", m.fval)) # valeur minimale de NLL3
 
 
 
