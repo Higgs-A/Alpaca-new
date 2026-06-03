@@ -7,7 +7,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import KFold
 
 # Imports de tes classes et fonctions locales
-from boosted_decision_tree import BoostedDecisionTree
+from boosted_decision_tree import XGBoost
 from get_data import get_clean_splits
 
 def grid_search_lr_and_stopping(X_train, y_train, weights_train):
@@ -48,7 +48,7 @@ def grid_search_lr_and_stopping(X_train, y_train, weights_train):
                 w_val_fold *= n_splits
                 
                 # Modèle vierge
-                test_model = BoostedDecisionTree()
+                test_model = XGBoost()
                 test_model.model.set_params(
                     learning_rate=lr,
                     early_stopping_rounds=stopping
