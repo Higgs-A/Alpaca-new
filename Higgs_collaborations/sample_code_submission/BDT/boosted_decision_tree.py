@@ -80,6 +80,9 @@ class BoostedDecisionTree:
             verbose=False,
         )
 
+        print("Best iteration:", self.model.best_iteration)
+        print("Best score:", self.model.best_score)
+
     def predict(self, test_data):
         test_data = self.scaler.transform(test_data)
         return self.model.predict_proba(test_data)[:, 1]
