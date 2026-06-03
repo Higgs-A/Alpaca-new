@@ -680,7 +680,7 @@ def likelihood_fit_mu_tes_jes(
 
     m = Minuit(
         lambda mu, tes, jes:
-        NLL(mu, tes, jes, n_obs, f, g),
+        NLL_mu_tes_jes(mu, tes, jes, n_obs, f, g),
 
         mu=1.0,
         tes=1.0,
@@ -732,9 +732,7 @@ def plot_delta_nll_mu_tes_jes(
     for one fitted parameter.
     """
 
-    ##########################################################################
     # Determine ±1σ interval
-    ##########################################################################
 
     left_mask = x_values < x_hat
     right_mask = x_values > x_hat
@@ -857,9 +855,7 @@ def plot_delta_nll_mu_tes_jes(
     plt.show()
 
 
-##############################################################################
-#                       PROFILE LIKELIHOOD SCANS
-##############################################################################
+#profile likelihood scans pour mu, tes et jes
 
 def plot_profile_likelihood_scans(
     fit_result,
@@ -902,7 +898,7 @@ def plot_profile_likelihood_scans(
     )
 
     delta_nll_mu = np.array([
-        NLL(
+        NLL_mu_tes_jes(
             mu,
             tes_hat,
             jes_hat,
@@ -913,7 +909,7 @@ def plot_profile_likelihood_scans(
         for mu in mu_values
     ])
 
-    plot_delta_nll_scan(
+    plot_delta_nll_mu_tes_jes(
         mu_values,
         delta_nll_mu,
         mu_hat,
@@ -929,7 +925,7 @@ def plot_profile_likelihood_scans(
     )
 
     delta_nll_tes = np.array([
-        NLL(
+        NLL_mu_tes_jes(
             mu_hat,
             tes,
             jes_hat,
@@ -940,7 +936,7 @@ def plot_profile_likelihood_scans(
         for tes in tes_values
     ])
 
-    plot_delta_nll_scan(
+    plot_delta_nll_mu_tes_jes(
         tes_values,
         delta_nll_tes,
         tes_hat,
@@ -956,7 +952,7 @@ def plot_profile_likelihood_scans(
     )
 
     delta_nll_jes = np.array([
-        NLL(
+        NLL_mu_tes_jes(
             mu_hat,
             tes_hat,
             jes,
@@ -967,9 +963,48 @@ def plot_profile_likelihood_scans(
         for jes in jes_values
     ])
 
-    plot_delta_nll_scan(
+    plot_delta_nll_mu_tes_jes(
         jes_values,
         delta_nll_jes,
         jes_hat,
         "JES",
     )
+
+
+def plot_binned_histograms_mu_jes_tes(n_obs, f, g, fit_results, plot_show=True):
+    mu_hat = fit_results["mu"]
+    tes_hat = fit_results["tes"]
+    jes_hat = fit_results["jes"]
+    n_bins = len(n_obs)
+    bin_centers = np.arange(n_bins) + 0.5  # Représentation par indice de bin
+   
+    #spectres de signal et fond au point de best fit
+    S_post_fit = np.array([f[i](tes_hat) for i in range(n_bins)])
+    B_post_fit = np.array([g[i](jes_hat) for i in range(n_bins)])
+   
+    model_post_fit = mu_hat * S_post_fit + B_post_fit
+    plt.figure(figsize=(9, 5.5))
+   
+    # données observées
+    plt.errorbar(bin_centers, n_obs, yerr=np.sqrt(n_obs), fmt='ko',
+                 label="Données observées ($N_{obs}$)", zorder=3)
+   
+    # histogramme du fond ajusté
+    plt.bar(bin_centers, B_post_fit, width=1.0, alpha=0.4, color="orange",
+            edgecolor="darkorange", label=f"Fond Post-fit (JES = {jes_hat:.3f})", zorder=1)
+   
+    # 3. Modèle total ajusté
+    plt.step(np.arange(n_bins + 1), np.append(model_post_fit, model_post_fit[-1]), where="post",
+             color="green", linewidth=2.5,
+             label=f"Signal + Fond ($\\hat{{\\mu}}$ = {mu_hat:.2f}, TES = {tes_hat:.3f})", zorder=2)
+   
+    plt.xlabel("Index du Bin")
+    plt.ylabel("Nombre d'Événements (Pondérés)")
+    plt.title("Histogramme Binné Post-Fit : Effet des Incertitudes Systématiques")
+    plt.xticks(bin_centers, [f"Bin {i+1}" for i in range(n_bins)])
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.legend(loc="upper right")
+    plt.tight_layout()
+   
+    if plot_show:
+        plt.show()
