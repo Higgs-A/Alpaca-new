@@ -15,7 +15,7 @@ from systematic_analysis import tes_fitter, jes_fitter
 # ==============================================================================
 
 def visualiser_impact_tes(model, training_dict):
-    tes_values = np.linspace(0.97, 1.03, 7)
+    tes_values = np.linspace(0.9, 1.0, 10)
     
     # Grille 2x3 : 3 plots en haut, 2 en bas pour les différences
     fig = plt.figure(figsize=(20, 12))
@@ -49,7 +49,7 @@ def visualiser_impact_tes(model, training_dict):
 # ==============================================================================
 
 def visualiser_impact_tes(model, training_dict):
-    tes_values = np.linspace(0.97, 1.03, 15)  # Plus de points pour une courbe plus lisse
+    tes_values = np.linspace(0.9, 1.1, 25)  # Plus de points pour une courbe plus lisse
     num_bins = 6
     
     fig = plt.figure(figsize=(20, 12))
@@ -161,7 +161,7 @@ df_complet = pd.read_parquet(data_path)
 
 # 2. On divise le dataset en Train (80%) et Eval (20%)
 # L'utilisation d'un random_state garantit que la séparation sera toujours la même
-df_train, df_eval = train_test_split(df_complet, test_size=0.20, random_state=42)
+df_train, df_eval = train_test_split(df_complet, test_size=0.20, random_state=42) #on est pas obligés de garder le random state, mais ça peut aider à la reproductibilité et au debug 
 
 # 3. Fonction pour le wrapper (qui ne tire QUE dans df_train)
 def get_train_set_custom(selected_indices):
@@ -197,7 +197,7 @@ visualiser_impact_tes(mon_wrapper.model, eval_dict)
 print("Calcul de la paramétrisation TES (sur l'Eval Set)...")
 transformateur_tes = tes_fitter(
     model=mon_wrapper.model,
-    train_set=eval_dict  # Attention au nom de l'argument dans ton fichier systematic_analysis.py
+    train_set=eval_dict  
 )
 print("Analyse terminée.")
 
