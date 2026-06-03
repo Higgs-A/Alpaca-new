@@ -183,48 +183,177 @@ def compute_mu_unbinned(mu0, S_scores, S_weights, B_scores, B_weights, N_scores,
 
 # PLOTS 
 
-def plot_likelihood(n_obs, S, B, mu_hat, plot_show=True):
-    '''Plot likelihood for Task 1a'''
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+
+
+def plot_profile_likelihood_scan(
+    n_obs,
+    S,
+    B,
+    mu_hat,
+    plot_show=True,
+):
+    """
+    Plot ΔNLL(μ) for a binned likelihood scan, showing the best-fit μ and 1σ confidence interval.
+
+    Paramètres: 
+    N_obs : tableau, le nb de données observées dans chaque bin.
+    S : tableau, le nb de signaux attendus dans chaque bin pour μ=1.
+    B : tableau, le nb de fonds attendus dans chaque bin.
+    mu_hat : la valeur de μ qui minimise la NLL.
+
+    NLL : la fonction de log-vraisemblance négative à minimiser.
+    """
+
     def neg_ll(mu):
         lam = mu * S + B
         lam = np.clip(lam, 1e-10, None)
+
         return -(n_obs * np.log(lam) - lam)
 
-    mu_vals_full = np.linspace(0, 5, 1000)
-    nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
-    nll_min = np.min(nll_vals_full)
-    delta_nll_full = nll_vals_full - nll_min
+    # Scan μ
+    mu_values = np.linspace(
+        0,
+        max(5, 2 * mu_hat + 1),
+        1000,
+    )
 
-    mask = delta_nll_full < 20
-    mu_vals = mu_vals_full[mask]
-    delta_nll = delta_nll_full[mask]
+    nll_values = np.array(
+        [neg_ll(mu) for mu in mu_values]
+    )
 
-    left_mask = mu_vals < mu_hat
-    right_mask = mu_vals > mu_hat
+    nll_min = np.min(nll_values)
+
+    delta_nll = nll_values - nll_min
+
+    # Mask pour se concentrer sur la région d'intérêt
+    mask = delta_nll < 20
+
+    mu_values = mu_values[mask]
+    delta_nll = delta_nll[mask]
+
+    # Trouver les points où ΔNLL = 0.5 pour l'intervalle de confiance à 1σ
+    left_mask = mu_values < mu_hat
+    right_mask = mu_values > mu_hat
 
     try:
-        from scipy.interpolate import interp1d
-        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
-        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
-        mu_lower = float(left_interp(0.5))
-        mu_upper = float(right_interp(0.5))
-        delta_mu = mu_upper - mu_lower
+
+        left_interp = interp1d(
+            delta_nll[left_mask],
+            mu_values[left_mask],
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+
+        right_interp = interp1d(
+            delta_nll[right_mask],
+            mu_values[right_mask],
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+
+        mu_minus = float(left_interp(0.5))
+        mu_plus = float(right_interp(0.5))
+
     except Exception as e:
-        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
+
         print("Interpolation error:", e)
 
+        mu_minus = mu_hat
+        mu_plus = mu_hat
+
+    # Plot
     plt.figure(figsize=(8, 5))
-    plt.plot(mu_vals, delta_nll, label=r"Single Binned $\Delta$NLL", color="blue")
-    plt.axvline(mu_hat, color="red", linestyle="--", label=rf"Single Binned $\hat\mu = {mu_hat:.3f}$")
-    plt.axvline(mu_lower, color="green", linestyle="--", label=rf"Single Binned $\mu_{{-1\sigma}} = {mu_lower:.3f}$")
-    plt.axvline(mu_upper, color="green", linestyle="--", label=rf"Single Binned $\mu_{{+1\sigma}} = {mu_upper:.3f}$")
+
+    plt.plot(
+        mu_values,
+        delta_nll,
+        linewidth=2,
+        label=r"$\Delta$NLL$(\mu)$",
+    )
+
+    # Best-fit point
+    plt.axvline(
+        mu_hat,
+        color="red",
+        linestyle="--",
+        label=rf"$\hat{{\mu}}={mu_hat:.3f}$",
+    )
+
+    plt.scatter(
+        [mu_hat],
+        [0],
+        color="red",
+        zorder=5,
+    )
+
+    # ΔNLL = 0.5
+    plt.axhline(
+        0.5,
+        color="black",
+        linestyle=":",
+        label=r"$\Delta$NLL = 0.5",
+    )
+
+    # ±1σ interval
+    plt.axvline(
+        mu_minus,
+        color="green",
+        linestyle=":",
+    )
+
+    plt.axvline(
+        mu_plus,
+        color="green",
+        linestyle=":",
+    )
+
+    plt.scatter(
+        [mu_minus, mu_plus],
+        [0.5, 0.5],
+        color="green",
+        zorder=5,
+    )
+
+    # Labels
+    plt.annotate(
+        rf"$\hat{{\mu}}={mu_hat:.3f}$",
+        xy=(mu_hat, 0),
+        xytext=(10, 10),
+        textcoords="offset points",
+    )
+
+    plt.annotate(
+        rf"$\mu_{{-1\sigma}}={mu_minus:.3f}$",
+        xy=(mu_minus, 0.5),
+        xytext=(-70, 10),
+        textcoords="offset points",
+    )
+
+    plt.annotate(
+        rf"$\mu_{{+1\sigma}}={mu_plus:.3f}$",
+        xy=(mu_plus, 0.5),
+        xytext=(10, 10),
+        textcoords="offset points",
+    )
+
     plt.xlabel(r"$\mu$")
-    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
-    plt.title(rf"Single Binned Profile Likelihood: $\delta\mu$ = {delta_mu:.3f}")
-    plt.legend()
+    plt.ylabel(r"$\Delta$NLL")
+
+    plt.title(
+        "Profile Likelihood Scan"
+    )
+
     plt.grid(True)
+    plt.legend()
     plt.tight_layout()
-    if plot_show: plt.show()
+
+    if plot_show:
+        plt.show()
+
+    return mu_minus, mu_plus
 
 
 def plot_binned_profile_likelihood(
