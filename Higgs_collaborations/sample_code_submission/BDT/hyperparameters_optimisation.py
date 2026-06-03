@@ -1,72 +1,111 @@
 from get_data import get_clean_splits
 from boosted_decision_tree import BoostedDecisionTree
-from courbes import significance_score
 
+from sklearn.model_selection import train_test_split
 import numpy as np
-import pandas as pd
 
 
+# ==================================================
+# AMS (Approximate Median Significance)
+# ==================================================
+def ams(s, b, b_reg=10.0):
+    """
+    AMS standard utilisé en Higgs ML competitions.
+
+    s = somme des poids signal
+    b = somme des poids background
+    b_reg = régularisation pour éviter instabilités
+    """
+
+    return np.sqrt(
+        2 * (
+            (s + b + b_reg) * np.log(1 + s / (b + b_reg)) - s
+        )
+    )
+
+
+# ==================================================
+# Significance score basé sur un seuil
+# ==================================================
+def significance_score(y_true, y_score, sample_weight, threshold=0.5):
+
+    y_pred = (y_score > threshold)
+
+    s = np.sum(sample_weight[(y_true == 1) & (y_pred == 1)])
+    b = np.sum(sample_weight[(y_true == 0) & (y_pred == 1)])
+
+    return ams(s, b)
+
+
+# ==================================================
+# MAIN OPTIMIZATION
+# ==================================================
 def optimize_hyperparameters():
+
+    print("\nChargement des données...")
 
     X_train, X_test, y_train, y_test, w_train, w_test = get_clean_splits()
 
-    
-    # PARTIE 1 : MAX_DEPTH
-    
+    # ==================================================
+    # SOUS-ECHANTILLONNAGE 10%
+    # ==================================================
+    X_train, _, y_train, _, w_train, _ = train_test_split(
+        X_train,
+        y_train,
+        w_train,
+        train_size=0.10,
+        random_state=42,
+        stratify=y_train
+    )
 
-    depth_results = []
+    X_test, _, y_test, _, w_test, _ = train_test_split(
+        X_test,
+        y_test,
+        w_test,
+        train_size=0.10,
+        random_state=42,
+        stratify=y_test
+    )
 
+    print(f"Train : {len(X_train):,} événements")
+    print(f"Test  : {len(X_test):,} événements")
+
+    # ==================================================
+    # OPTIMISATION MAX_DEPTH
+    # ==================================================
     depths = [5, 6, 7, 8, 9, 10]
 
     best_depth = None
-    best_depth_score = -np.inf
+    best_score = -np.inf
 
     print("\n===== MAX DEPTH OPTIMIZATION =====")
 
     for depth in depths:
 
+        print(f"\nTesting max_depth = {depth}")
+
         model = BoostedDecisionTree()
+        model.model.set_params(max_depth=depth)
 
-        model.model.set_params(
-            max_depth=depth
+        model.fit(X_train, y_train, weights=w_train)
+
+        preds = model.predict(X_test)
+
+        score = significance_score(
+            y_test,
+            preds,
+            w_test
         )
 
-        model.fit(
-            X_train,
-            y_train,
-            weights=w_train
-        )
+        print(f"AMS = {score:.4f}")
 
-        predictions = model.predict(X_test)
-
-        significance = significance_score(
-            y_true=y_test,
-            y_score=predictions,
-            sample_weight=w_test
-        )
-
-        depth_results.append(
-            [depth, significance]
-        )
-
-        if significance > best_depth_score:
-
-            best_depth_score = significance
+        if score > best_score:
+            best_score = score
             best_depth = depth
 
-    depth_df = pd.DataFrame(
-        depth_results,
-        columns=[
-            "max_depth",
-            "AMS"
-        ]
-    )
-
-    
-    # PARTIE 2 : SUBSAMPLE / COLSAMPLE
-
-    sampling_results = []
-
+    # ==================================================
+    # OPTIMISATION SUBSAMPLE / COLSAMPLE
+    # ==================================================
     subsamples = [0.7, 0.8, 0.9]
     colsamples = [0.7, 0.8, 0.9]
 
@@ -77,88 +116,39 @@ def optimize_hyperparameters():
     print("\n===== SUBSAMPLE / COLSAMPLE OPTIMIZATION =====")
 
     for subsample in subsamples:
-
         for colsample in colsamples:
+
+            print(f"\nTesting subsample={subsample}, colsample={colsample}")
 
             model = BoostedDecisionTree()
 
             model.model.set_params(
-
                 max_depth=best_depth,
-
                 subsample=subsample,
-
                 colsample_bytree=colsample
             )
 
-            model.fit(
-                X_train,
-                y_train,
-                weights=w_train
+            model.fit(X_train, y_train, weights=w_train)
+
+            preds = model.predict(X_test)
+
+            score = significance_score(
+                y_test,
+                preds,
+                w_test
             )
 
-            predictions = model.predict(X_test)
+            print(f"AMS = {score:.4f}")
 
-            significance = significance_score(
-                y_true=y_test,
-                y_score=predictions,
-                sample_weight=w_test
-            )
-
-            sampling_results.append(
-                [
-                    subsample,
-                    colsample,
-                    significance
-                ]
-            )
-
-            if significance > best_sampling_score:
-
-                best_sampling_score = significance
-
+            if score > best_sampling_score:
+                best_sampling_score = score
                 best_subsample = subsample
                 best_colsample = colsample
 
-    sampling_df = pd.DataFrame(
-        sampling_results,
-        columns=[
-            "subsample",
-            "colsample_bytree",
-            "AMS"
-        ]
-    )
-
-    
-    # AFFICHAGE
-    
-
-    print("\n")
-    print("=" * 60)
-    print("TABLEAU 1 : MAX_DEPTH")
-    print("=" * 60)
-
-    print(
-        depth_df.sort_values(
-            by="AMS",
-            ascending=False
-        ).to_string(index=False)
-    )
-
-    print("\n")
-    print("=" * 60)
-    print("TABLEAU 2 : SUBSAMPLE / COLSAMPLE")
-    print("=" * 60)
-
-    print(
-        sampling_df.sort_values(
-            by="AMS",
-            ascending=False
-        ).to_string(index=False)
-    )
-
-    print("\n")
-    print("=" * 60)
+    # ==================================================
+    # RESULTATS FINAUX
+    # ==================================================
+    print("\n" + "=" * 60)
     print("BEST CONFIGURATION")
     print("=" * 60)
 
@@ -167,17 +157,6 @@ def optimize_hyperparameters():
     print(f"colsample_bytree = {best_colsample}")
     print(f"AMS = {best_sampling_score:.4f}")
 
-    depth_df.to_csv(
-        "depth_optimization.csv",
-        index=False
-    )
-
-    sampling_df.to_csv(
-        "sampling_optimization.csv",
-        index=False
-    )
-
 
 if __name__ == "__main__":
-
     optimize_hyperparameters()
