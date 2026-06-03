@@ -104,11 +104,6 @@ def systematic_dependence(data, show=False, features=features_all):
                 errs_bkg = quad_err(background_biased,background_original)
                 quad_errs[f"{feat} (signal)"][f"{b_name} ({err})"] = errs_sig
                 quad_errs[f"{feat} (background)"][f"{b_name} ({err})"] = errs_bkg
-        
-        
-    quad_df = pd.DataFrame.from_dict(quad_errs, orient="index")
-    
-    if show:
             
             # Plotting the distributions for the current bias and feature
                 if show :
@@ -182,7 +177,7 @@ def systematic_dependence(data, show=False, features=features_all):
 
 
 
-    if not show:
+    if show:
         for feat in features:
             if feat not in dataframe_original.columns:
                 continue
@@ -195,11 +190,14 @@ def systematic_dependence(data, show=False, features=features_all):
             plt.legend()
             plt.tight_layout()
             plt.show()
+
+    quad_df = pd.DataFrame.from_dict(quad_errs, orient="index")
+    
     return quad_df
 
 
 def Score_systematics (data,features=features_all ) :
-    table_chi2=systematic_dependence(data, show=False, features=features)
+    table_chi2=systematic_dependence(data, show=True, features=features)
     score = table_chi2.sum(axis=1).to_dict()
     score_total = {}
     for feat, chi2 in score.items():
@@ -221,4 +219,9 @@ def Score_systematics (data,features=features_all ) :
 def minimal_dependent_features(data):
     return data.columns
 
-systematic_dependence(Data("c:/Users/noahl/Documents/EI_PP"), show=True)
+# systematic_dependence(Data("c:/Users/noahl/Documents/EI_PP"),True)
+data = Data("c:/Users/noahl/Documents/EI_PP")
+data.load_train_set()
+dfmod = data.get_train_set()
+df_lowbias = dfmod.drop(columns=["PRI_had_pt", "PRI_jet_subleading_pt", "DER_mass_vis", "DER_pt_ratio_lep_had"])
+df_lowcorr = dfmod.drop(columns=["PRI_lep_phi","PRI_had_phi","PRI_jet_subleading_phi","PRI_met_phi"])
