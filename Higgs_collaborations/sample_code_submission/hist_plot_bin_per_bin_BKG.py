@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
 from sklearn.model_selection import train_test_split
+import copy
 
 # Importations de vos fichiers locaux
 from model import Model
@@ -50,12 +51,12 @@ def visualiser_impact_bkg(model, training_dict):
 
     print("Analyse de l'impact de la normalisation du bruit (Bkg Scale)...")
     # Utilise .copy() ou recrée le dictionnaire pour protéger les données originales
-    set_nom = systematics(training_dict.copy(), bkg_scale=1.0)
+    set_nom = systematics(copy.deepcopy(training_dict), bkg_scale=1.0)
 
     for i, val in enumerate(bkg_values):
         # APPLICATION DE LA SYSTÉMATIQUE : On change uniquement bkg_scale
         # Envoie une copie du dictionnaire à la fonction
-        set_shift = systematics(training_dict.copy(), bkg_scale=val)
+        set_shift = systematics(copy.deepcopy(training_dict), bkg_scale=val)
         
         scores = np.array(model.predict(set_shift["data"])).ravel()
         labels = np.array(set_shift["labels"]).ravel()
