@@ -2,11 +2,12 @@ import sys
 from pathlib import Path
 import os
 
-# Ensure the package containing `HiggsML` is on sys.path so we can import HiggsML.datasets
-# black_swan_pkg_path = r'c:\Users\geoff\Documents\Centrale\cours_centrale\ST4\EI\black_swan_pkg'
-# if black_swan_pkg_path not in sys.path:
-#     sys.path.insert(0, black_swan_pkg_path)
-# from HiggsML.datasets import download_dataset
+# Ensure the package containing HiggsML is on sys.path so we can import HiggsML.datasets
+
+#black_swan_pkg_path = r'c:\Users\geoff\Documents\Centrale\cours_centrale\ST4\EI\black_swan_pkg'
+#if black_swan_pkg_path not in sys.path:
+    #sys.path.insert(0, black_swan_pkg_path)
+#from HiggsML.datasets import download_dataset
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
 from datasets import download_dataset
@@ -172,4 +173,32 @@ def best_features_set(data, n):
     return Score, combinaisons[indice_max]
 
 print(best_features_set(data_cleaned, 3))
+
+
+
+
+def engineering_angles(data):
+    df=data.copy()
     
+    # We take the colums which ended with "phi"
+    phi_cols = [col for col in df.columns if col.endswith('_phi')]
+    
+    for col in phi_cols:
+        # We create new features by taking the sine and cosine of the angle features
+        df[f'{col}_sin'] = np.sin(df[col])
+        df[f'{col}_cos'] = np.cos(df[col])
+    return df
+
+def to_cartesian(data, particle_prefix):
+    df = data.copy()
+    
+    pt = df[f'{particle_prefix}_pt']
+    phi = df[f'{particle_prefix}_phi']
+    eta = df[f'{particle_prefix}_eta']
+    
+    df[f'{particle_prefix}_px'] = pt * np.cos(phi)
+    df[f'{particle_prefix}_py'] = pt * np.sin(phi)
+    df[f'{particle_prefix}_pz'] = pt * np.sinh(eta)
+    
+    return df
+
