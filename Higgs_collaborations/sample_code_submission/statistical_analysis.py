@@ -385,6 +385,7 @@ def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp
 
 
 #Task 2: on ne travaille qu'avec une méthode binned pour l'instant
+import systematic_analysis.py as sys
 
 def likelihood_fit_mu_tes_jes(
     n_obs,
@@ -395,6 +396,7 @@ def likelihood_fit_mu_tes_jes(
     jes_min,
     jes_max,
 ):
+#on suppose que f et g sont les fonctions d'interpolations calculées par systematic_analysis.py pour gamma i et beta i respectivement 
 #f et g sont sous la forme d'un tableau de fonctions évaluées dans les bins, par exemple f[i](tes) donne la valeur de la fonction f pour le bin i et une valeur de tes. De même pour g[i](jes).
 #n-obs: tableau des nombres d'observations dans les bins, par exemple n_obs[i] donne le nombre d'observations dans le bin i.
 # tes_min et tes_max sont les limites de tes, jes_min et jes_max sont les limites de jes. Ces limites seront utilisées pour contraindre les paramètres tes et jes lors de l'optimisation avec Minuit.
