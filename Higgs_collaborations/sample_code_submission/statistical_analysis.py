@@ -820,7 +820,7 @@ def profile_likelihood_scan_mu(
  
  
 # Exécution de ton bloc de calcul
-scan = profile_likelihood_scan_mu(
+"""scan = profile_likelihood_scan_mu(
     n_obs,
     f,
     g,
@@ -843,7 +843,7 @@ print(f"tes_hat      = {tes_hat:.4f}")
 print(f"jes_hat      = {jes_hat:.4f}")
 print(f"bkg_norm_hat = {bkg_hat:.4f}")
 print(f"NLL_min      = {nll_min:.4f}")
- 
+ """
  
 def profile_nuisances_for_scenarios(mu_fixed, n_obs, f, g, tes_min, tes_max, jes_min, jes_max, fixed_list):
     """
