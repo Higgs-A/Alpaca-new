@@ -156,7 +156,6 @@ def prepare_unbinned(S_scores, S_weights, B_scores, B_weights):
 
 
 def unbinned_NLL(mu, N_scores, N_weights, pdf_S, pdf_B, N_S_exp, N_B_exp):
-    """Extended Unbinned Negative Log-Likelihood function CORRIGÉE."""
     if mu < 0:  # pénalité si minuit teste un mu négatif
         return 1e10  
     
@@ -552,7 +551,6 @@ def plot_binned_histograms(N_obs, S, B, mu_hat, N_bins=5, plot_show=True):
 
 
 def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
-    """Plot ΔNLL(μ) pour les données unbinned, parfaitement centré et parabolique."""
     def neg_ll(mu):
         return unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp)
  
@@ -657,328 +655,486 @@ def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp
  
 import numpy as np
 import matplotlib.pyplot as plt
+
 from iminuit import Minuit
 from scipy.interpolate import interp1d
- 
- 
-def NLL_3_systematics(
+
+from systematic_analysis import (
+    generer_saved_info,
+    N_total_bin,
+)
+
+##############################################################################
+# NLL COMPLETE
+##############################################################################
+
+def NLL_systematics(
     mu,
     tes,
     jes,
-    bkg_norm,
+    bnorm,
+    smet,
     n_obs,
-    f,
-    g,
+    saved_info,
 ):
-    """
-    Binned Poisson NLL.
- 
-    f[i](tes, jes, bkg_norm)
-        -> prediction signal dans le bin i
- 
-    g[i](tes, jes, bkg_norm)
-        -> prediction background dans le bin i
-    """
- 
-    penalty_tes = 0.5 * ((tes - 1.0) / 0.03) ** 2
- 
-    penalty_jes = 0.5 * ((jes - 1.0) / 0.03) ** 2
- 
-    penalty_bkg = 0.5 * ((bkg_norm - 1.0) / 0.03) ** 2
- 
+
     nll = 0.0
- 
-    for i in range(len(n_obs)):
- 
-        gamma_i = f[i](
-            tes,
-            jes,
-            bkg_norm,
+
+    n_bins = len(n_obs)
+
+    for i in range(n_bins):
+
+        S_i = N_total_bin(
+            bin_i=i,
+            tes=tes,
+            jes=jes,
+            bnorm=bnorm,
+            smet=smet,
+            saved_info=saved_info,
+            classe="S",
         )
- 
-        beta_i = g[i](
-            tes,
-            jes,
-            bkg_norm,
+
+        B_i = N_total_bin(
+            bin_i=i,
+            tes=tes,
+            jes=jes,
+            bnorm=bnorm,
+            smet=smet,
+            saved_info=saved_info,
+            classe="B",
         )
- 
-        lam = mu * gamma_i + beta_i
- 
+
+        lam = mu * S_i + B_i
+
         lam = max(lam, 1e-10)
- 
-        nll -= (
-            n_obs[i] * np.log(lam)
-            - lam
+
+        nll += lam - n_obs[i] * np.log(lam)
+
+    ##########################################################################
+    # CONTRAINTES GAUSSIENNES
+    ##########################################################################
+
+    nll += 0.5 * ((tes - 1.0) / 0.03) ** 2
+
+    nll += 0.5 * ((jes - 1.0) / 0.03) ** 2
+
+    nll += 0.5 * ((bnorm - 1.0) / 0.05) ** 2
+
+    nll += 0.5 * ((smet - 0.0) / 3.0) ** 2
+
+    return nll
+
+
+##############################################################################
+# FIT GLOBAL
+##############################################################################
+
+def fit_global(
+    n_obs,
+    saved_info,
+    active_nuisances,
+):
+
+    def nll(
+        mu,
+        tes,
+        jes,
+        bnorm,
+        smet,
+    ):
+
+        return NLL_systematics(
+            mu,
+            tes,
+            jes,
+            bnorm,
+            smet,
+            n_obs,
+            saved_info,
         )
- 
-    return (
-        nll
-        + penalty_tes
-        + penalty_jes
-        + penalty_bkg
+
+    m = Minuit(
+        nll,
+        mu=1.0,
+        tes=1.0,
+        jes=1.0,
+        bnorm=1.0,
+        smet=0.0,
     )
- 
- 
+
+    m.errordef = Minuit.LIKELIHOOD
+
+    m.limits["mu"] = (0.0, None)
+
+    m.limits["tes"] = (0.97, 1.03)
+
+    m.limits["jes"] = (0.97, 1.03)
+
+    m.limits["bnorm"] = (0.95, 1.05)
+
+    m.limits["smet"] = (0.0, 3.0)
+
+    all_nuisances = [
+        "tes",
+        "jes",
+        "bnorm",
+        "smet",
+    ]
+
+    for nuisance in all_nuisances:
+
+        if nuisance not in active_nuisances:
+
+            m.fixed[nuisance] = True
+
+            if nuisance == "smet":
+                m.values[nuisance] = 0.0
+            else:
+                m.values[nuisance] = 1.0
+
+    m.migrad()
+    m.hesse()
+
+    return m
+
+
+##############################################################################
+# PROFILAGE DES NUISANCES
+##############################################################################
+
 def profile_nuisances(
     mu_fixed,
     n_obs,
-    f,
-    g,
-    tes_min,
-    tes_max,
-    jes_min,
-    jes_max,
+    saved_info,
+    active_nuisances,
 ):
- 
+
     def nll_profiled(
         tes,
         jes,
-        bkg_norm,
+        bnorm,
+        smet,
     ):
-        return NLL_3_systematics(
+
+        return NLL_systematics(
             mu_fixed,
             tes,
             jes,
-            bkg_norm,
+            bnorm,
+            smet,
             n_obs,
-            f,
-            g,
+            saved_info,
         )
- 
+
     m = Minuit(
         nll_profiled,
         tes=1.0,
         jes=1.0,
-        bkg_norm=1.0,
+        bnorm=1.0,
+        smet=0.0,
     )
- 
-    m.limits["tes"] = (
-        tes_min,
-        tes_max,
-    )
- 
-    m.limits["jes"] = (
-        jes_min,
-        jes_max,
-    )
- 
-    m.limits["bkg_norm"] = (
-        0.5,
-        1.5,
-    )
- 
+
     m.errordef = Minuit.LIKELIHOOD
- 
+
+    m.limits["tes"] = (0.97, 1.03)
+
+    m.limits["jes"] = (0.97, 1.03)
+
+    m.limits["bnorm"] = (0.95, 1.05)
+
+    m.limits["smet"] = (0.0, 3.0)
+
+    all_nuisances = [
+        "tes",
+        "jes",
+        "bnorm",
+        "smet",
+    ]
+
+    for nuisance in all_nuisances:
+
+        if nuisance not in active_nuisances:
+
+            m.fixed[nuisance] = True
+
+            if nuisance == "smet":
+                m.values[nuisance] = 0.0
+            else:
+                m.values[nuisance] = 1.0
+
     m.migrad()
-    m.hesse()
- 
-    return {
-        "tes_hat": m.values["tes"],
-        "jes_hat": m.values["jes"],
-        "bkg_hat": m.values["bkg_norm"],
-        "nll": m.fval,
-    }
- 
- 
-def profile_likelihood_scan_mu(
+
+    return m.fval
+
+
+##############################################################################
+# PROFILE LIKELIHOOD SCAN
+##############################################################################
+
+def profile_scan_mu(
+    mu_values,
     n_obs,
-    f,
-    g,
-    tes_min,
-    tes_max,
-    jes_min,
-    jes_max,
+    saved_info,
+    active_nuisances,
 ):
- 
-    mu_values = np.linspace(
-        0.5,
-        1.5,
-        101,
+
+    fit = fit_global(
+        n_obs,
+        saved_info,
+        active_nuisances,
     )
- 
+
+    global_min = fit.fval
+
     profiled_nll = []
- 
-    tes_best = []
-    jes_best = []
-    bkg_best = []
- 
+
     for mu in mu_values:
- 
-        result = profile_nuisances(
+
+        nll_mu = profile_nuisances(
             mu,
             n_obs,
-            f,
-            g,
-            tes_min,
-            tes_max,
-            jes_min,
-            jes_max,
+            saved_info,
+            active_nuisances,
         )
- 
+
         profiled_nll.append(
-            result["nll"]
+            nll_mu
         )
- 
-        tes_best.append(
-            result["tes_hat"]
+
+    profiled_nll = np.array(
+        profiled_nll
+    )
+
+    delta_nll = (
+        profiled_nll
+        - global_min
+    )
+
+    return delta_nll
+
+
+##############################################################################
+# EXTRACTION SIGMA
+##############################################################################
+
+def extract_sigma(
+    mu_values,
+    delta_nll,
+):
+
+    idx_min = np.argmin(
+        delta_nll
+    )
+
+    mu_hat = mu_values[idx_min]
+
+    left_mask = mu_values < mu_hat
+
+    right_mask = mu_values > mu_hat
+
+    try:
+
+        left_interp = interp1d(
+            delta_nll[left_mask],
+            mu_values[left_mask],
+            bounds_error=False,
+            fill_value="extrapolate",
         )
- 
-        jes_best.append(
-            result["jes_hat"]
+
+        right_interp = interp1d(
+            delta_nll[right_mask],
+            mu_values[right_mask],
+            bounds_error=False,
+            fill_value="extrapolate",
         )
- 
-        bkg_best.append(
-            result["bkg_hat"]
+
+        mu_minus = float(
+            left_interp(0.5)
         )
- 
-    return {
-        "mu": np.array(mu_values),
-        "nll": np.array(profiled_nll),
-        "tes_hat": np.array(tes_best),
-        "jes_hat": np.array(jes_best),
-        "bkg_hat": np.array(bkg_best),
-    }
- 
- 
-# Exécution de ton bloc de calcul
-"""scan = profile_likelihood_scan_mu(
+
+        mu_plus = float(
+            right_interp(0.5)
+        )
+
+        sigma_mu = (
+            mu_plus - mu_minus
+        ) / 2.0
+
+    except Exception:
+
+        mu_minus = mu_hat
+
+        mu_plus = mu_hat
+
+        sigma_mu = np.nan
+
+    return (
+        mu_hat,
+        mu_minus,
+        mu_plus,
+        sigma_mu,
+    )
+
+
+##############################################################################
+# PLOT FINAL
+##############################################################################
+
+def plot_profiled_nuisance_impact(
     n_obs,
-    f,
-    g,
-    tes_min,
-    tes_max,
-    jes_min,
-    jes_max,
-)
- 
-idx = np.argmin(scan["nll"])
- 
-mu_hat = scan["mu"][idx]
-nll_min = scan["nll"][idx]
-tes_hat = scan["tes_hat"][idx]
-jes_hat = scan["jes_hat"][idx]
-bkg_hat = scan["bkg_hat"][idx]
- 
-print(f"mu_hat       = {mu_hat:.4f}")
-print(f"tes_hat      = {tes_hat:.4f}")
-print(f"jes_hat      = {jes_hat:.4f}")
-print(f"bkg_norm_hat = {bkg_hat:.4f}")
-print(f"NLL_min      = {nll_min:.4f}")
- """
- 
-def profile_nuisances_for_scenarios(mu_fixed, n_obs, f, g, tes_min, tes_max, jes_min, jes_max, fixed_list):
-    """
-    Fonction auxiliaire pour calculer la NLL d'un scénario bridé.
-    Gèle à 1.0 les paramètres contenus dans 'fixed_list'.
-    """
-    def nll_profiled(tes, jes, bkg_norm):
-        return NLL_3_systematics(mu_fixed, tes, jes, bkg_norm, n_obs, f, g)
- 
-    m = Minuit(nll_profiled, tes=1.0, jes=1.0, bkg_norm=1.0)
-    m.limits["tes"] = (tes_min, tes_max)
-    m.limits["jes"] = (jes_min, jes_max)
-    m.limits["bkg_norm"] = (0.5, 1.5)
-    m.errordef = Minuit.LIKELIHOOD
- 
-    # Bloquer les paramètres ciblés pour ce scénario
-    for param in fixed_list:
-        m.fixed[param] = True
-        m.values[param] = 1.0  # Réinitialisation stricte à la valeur nominale
- 
-    m.migrad()
-    return m.fval
- 
- 
-def plot_profile_likelihood_scans_superposition(n_obs, f, g, tes_min, tes_max, jes_min, jes_max, scan):
-    mu_values = scan["mu"]
-   
-    # 4 scénarios d'analyse cumulatifs
+    saved_info,
+):
+
+    mu_values = np.linspace(
+        0.0,
+        3.0,
+        120,
+    )
+
     scenarios = [
-        {"name": "1. Stat-Only", "fixed": ["tes", "jes", "bkg_norm"], "color": "#1f77b4", "nll": []},
-        {"name": "2. Stat + JES", "fixed": ["tes", "bkg_norm"], "color": "#ff7f0e", "nll": []},
-        {"name": "3. Stat + JES + TES", "fixed": ["bkg_norm"], "color": "#2ca02c", "nll": []},
-        {"name": "4. Full Fit", "fixed": [], "color": "#d62728", "nll": list(scan["nll"])}
+
+        {
+            "label": "Stat only",
+            "active": [],
+        },
+
+        {
+            "label": "TES",
+            "active": [
+                "tes",
+            ],
+        },
+
+        {
+            "label": "TES + JES",
+            "active": [
+                "tes",
+                "jes",
+            ],
+        },
+
+        {
+            "label": "TES + JES + BNORM + SMET",
+            "active": [
+                "tes",
+                "jes",
+                "bnorm",
+                "smet",
+            ],
+        },
     ]
- 
-    # Calcul des NLL pour les scénarios 1, 2 et 3
-    for sc in scenarios:
-        if len(sc["nll"]) == 0:  # Si la liste est vide, on calcule
-            for mu in mu_values:
-                nll_val = profile_nuisances_for_scenarios(
-                    mu, n_obs, f, g, tes_min, tes_max, jes_min, jes_max, sc["fixed"]
-                )
-                sc["nll"].append(nll_val)
-       
-        sc["nll"] = np.array(sc["nll"])
-        sc["dnll"] = sc["nll"] - np.min(sc["nll"])
- 
-    plt.figure(figsize=(12, 7.5))
-   
-    # Delta-NLL = 0.5 pour l'incertitude 1-sigma
-    plt.axhline(0.5, color="#475569", linestyle="-.", alpha=0.6, label=r"$\Delta$NLL = 0.5 ($\pm 1\sigma$)")
- 
-    # Analyse mathématique fine et traçage de chaque parabole
-    for sc in scenarios:
-        dnll = sc["dnll"]
-        color = sc["color"]
-       
-        # Extraction du minimum de la courbe courante
-        idx_min = np.argmin(dnll)
-        sc_mu_hat = mu_values[idx_min]
-       
-        # Séparation de la courbe à gauche et à droite pour l'interpolation 1-sigma
-        left_mask = mu_values < sc_mu_hat
-        right_mask = mu_values > sc_mu_hat
-       
-        error_str = ""
-        delta_mu_str = ""
-       
-        try:
-            # Interpolation spline linéaire pour trouver le croisement exact avec Delta-NLL = 0.5
-            left_interp = interp1d(dnll[left_mask], mu_values[left_mask], bounds_error=False, fill_value="extrapolate")
-            right_interp = interp1d(dnll[right_mask], mu_values[right_mask], bounds_error=False, fill_value="extrapolate")
-           
-            mu_minus = float(left_interp(0.5))
-            mu_plus = float(right_interp(0.5))
-           
-            # Calcul des erreurs asymétriques et du Delta total de l'abscisse (largeur à 1-sigma)
-            err_minus = sc_mu_hat - mu_minus
-            err_plus = mu_plus - sc_mu_hat
-            delta_mu = mu_plus - mu_minus
-           
-            error_str = rf"$\mu = {sc_mu_hat:.3f}_{{-{err_minus:.3f}}}^{{+{err_plus:.3f}}}$"
-            delta_mu_str = rf" | $\Delta\mu_{{1\sigma}} = {delta_mu:.3f}$"
-           
-            # Points marqueurs colorés aux intersections horizontales à Y = 0.5
-            plt.scatter([mu_minus, mu_plus], [0.5, 0.5], color=color, s=40, zorder=5)
-            # Lignes pointillées verticales projetées vers l'axe X
-            plt.axvline(mu_minus, color=color, linestyle=":", alpha=0.35, lw=1.2)
-            plt.axvline(mu_plus, color=color, linestyle=":", alpha=0.35, lw=1.2)
-           
-        except Exception:
-            error_str = rf"$\hat{{\mu}} = {sc_mu_hat:.3f}$"
-            delta_mu_str = " (Erreur d'interpolation)"
- 
-        # Tracé de la ligne principale de la parabole
-        full_label = f"{sc['name']} : {error_str}{delta_mu_str}"
-        plt.plot(mu_values, dnll, label=full_label, color=color, lw=2.5)
-       
-        # Marqueur physique du point de best-fit au minimum (Y = 0)
-        plt.scatter([sc_mu_hat], [0], color=color, s=50, edgecolors='black', zorder=6)
- 
-    # Configuration des métadonnées du graphique
-    plt.xlabel(r"Paramètre d'intérêt (Force du Signal $\mu$)", fontsize=12, labelpad=8)
-    plt.ylabel(r"$\Delta$NLL = NLL - $\text{NLL}_{min}$", fontsize=12, labelpad=8)
-    plt.title("Profils de Vraisemblance Cumulatifs : Dégradation de la Précision de $\mu$ par les Systématiques",
-              fontsize=13, fontweight='bold', pad=18)
-   
-    plt.xlim(mu_values.min(), mu_values.max())
-    plt.ylim(-0.15, 3.5)
-   
-    plt.grid(True, linestyle="--", alpha=0.45, zorder=0)
-    plt.legend(loc="upper center", fontsize=9.5, framealpha=0.95, facecolor='white', edgecolor='#cbd5e1')
-   
+
+    plt.figure(
+        figsize=(12, 8)
+    )
+
+    for scenario in scenarios:
+
+        print(
+            "\nFit scenario :",
+            scenario["label"]
+        )
+
+        delta_nll = profile_scan_mu(
+            mu_values,
+            n_obs,
+            saved_info,
+            scenario["active"],
+        )
+
+        (
+            mu_hat,
+            mu_minus,
+            mu_plus,
+            sigma_mu,
+        ) = extract_sigma(
+            mu_values,
+            delta_nll,
+        )
+
+        print(
+            f"mu_hat = {mu_hat:.4f}"
+        )
+
+        print(
+            f"sigma_mu = {sigma_mu:.4f}"
+        )
+
+        plt.plot(
+            mu_values,
+            delta_nll,
+            linewidth=2.5,
+            label=(
+                f"{scenario['label']} "
+                f"(σμ={sigma_mu:.3f})"
+            ),
+        )
+
+        plt.scatter(
+            [mu_hat],
+            [0],
+            s=50,
+        )
+
+        plt.scatter(
+            [mu_minus, mu_plus],
+            [0.5, 0.5],
+            s=30,
+        )
+
+    plt.axhline(
+        0.5,
+        linestyle="--",
+        color="black",
+        label=r"$\Delta NLL = 0.5$",
+    )
+
+    plt.xlabel(
+        r"$\mu$",
+        fontsize=13,
+    )
+
+    plt.ylabel(
+        r"$\Delta NLL$",
+        fontsize=13,
+    )
+
+    plt.title(
+        "Profile Likelihood Scan : Impact des Paramètres de Nuisance",
+        fontsize=14,
+    )
+
+    plt.grid(
+        True,
+        alpha=0.3,
+    )
+
+    plt.legend()
+
     plt.tight_layout()
+
     plt.show()
- 
- 
+
+
+##############################################################################
+# EXECUTION
+##############################################################################
+
+saved_info = generer_saved_info(
+    model,
+    training_dict,
+)
+
+##########################################################################
+# n_obs doit être un tableau de longueur = nombre de bins
+#
+# Exemple :
+#
+# n_obs = np.array([...])
+#
+##########################################################################
+
+plot_profiled_nuisance_impact(
+    n_obs,
+    saved_info,
+)
