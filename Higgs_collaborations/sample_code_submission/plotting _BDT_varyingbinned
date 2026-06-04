@@ -1,0 +1,151 @@
+import argparse
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt  # <-- Added for the custom plot
+from sklearn.model_selection import train_test_split
+from iminuit import Minuit
+
+project_root = Path(__file__).resolve().parent
+sys.path.append(str(project_root))
+
+from boosted_decision_tree import XGBoost_BDT
+from statistical_analysis import prepare_binned, NLL # plot_binned_profile_likelihood is no longer needed here
+
+DEFAULT_DATA_DIR = Path.home() / "Downloads" / "blackSwan_data"
+
+def find_data_file(data_dir):
+    data_dir = Path(data_dir)
+    if data_dir.is_file():
+        return data_dir
+    if not data_dir.is_dir():
+        raise FileNotFoundError(f"Data directory not found: {data_dir}")
+    for pattern in ["*.npz", "*.csv", "*.parquet"]:
+        files = sorted(data_dir.glob(pattern))
+        if files:
+            return files[0]
+    raise FileNotFoundError(f"No supported data file found in {data_dir}")
+
+def load_black_swan_dataset(path):
+    path = Path(path)
+    if path.suffix == ".npz":
+        data = np.load(path, allow_pickle=True)
+        if "X" in data and "y" in data:
+            X = np.asarray(data["X"], dtype=np.float32)
+            y = np.asarray(data["y"], dtype=np.int32)
+            weights = np.asarray(data.get("w", data.get("weights", np.ones(len(y)))), dtype=np.float32)
+            return X, y, weights
+        if "data" in data and "labels" in data:
+            X = np.asarray(data["data"], dtype=np.float32)
+            y = np.asarray(data["labels"], dtype=np.int32)
+            weights = np.asarray(data.get("weights", np.ones(len(y))), dtype=np.float32)
+            return X, y, weights
+        raise ValueError("npz file must contain X/y or data/labels")
+
+    if path.suffix == ".csv":
+        df = pd.read_csv(path)
+    elif path.suffix == ".parquet":
+        df = pd.read_parquet(path)
+    else:
+        raise ValueError(f"Unsupported data file type: {path.suffix}")
+
+    if "labels" not in df.columns or "weights" not in df.columns:
+        raise ValueError("Parquet/CSV file must contain `labels` and `weights` columns")
+
+    y = df["labels"].to_numpy(dtype=np.int32)
+    weights = df["weights"].to_numpy(dtype=np.float32)
+
+    X_df = df.drop(columns=["labels", "weights"], errors="ignore")
+    non_numeric = X_df.select_dtypes(exclude=[np.number]).columns.tolist()
+    if non_numeric:
+        print(f"[INFO] Dropping non-numeric feature columns: {non_numeric}")
+    X_df = X_df.select_dtypes(include=[np.number])
+    if X_df.shape[1] == 0:
+        raise ValueError("No numeric feature columns found after dropping non-numeric columns.")
+    X = X_df.to_numpy(dtype=np.float32)
+
+    return X, y, weights
+
+def fit_mu_binned(N_obs, S, B, mu0=1.0):
+    N_obs = np.asarray(N_obs, dtype=np.float64)
+    S = np.asarray(S, dtype=np.float64)
+    B = np.asarray(B, dtype=np.float64)
+    nll_fn = lambda mu: NLL(mu, N_obs, S, B)
+    m = Minuit(nll_fn, mu=mu0)
+    m.limits["mu"] = (0, None)
+    m.errordef = Minuit.LIKELIHOOD
+    m.migrad()
+    m.hesse()
+    return float(m.values["mu"]), float(m.errors["mu"]), float(m.fval)
+
+def main(data_dir=DEFAULT_DATA_DIR, n_bins_list=[1, 2, 5, 10, 25], test_size=0.3, random_state=42):
+    source_file = find_data_file(data_dir)
+    print(f"Loading data from: {source_file}")
+    X, y, weights = load_black_swan_dataset(source_file)
+
+    X_train, X_test, y_train, y_test, w_train, w_test = train_test_split(
+        X, y, weights, test_size=test_size, random_state=random_state, stratify=y
+    )
+
+    print("Training BDT model...")
+    model = XGBoost_BDT()
+    model.fit(X_train, y_train, weights=w_train)
+    
+    print("Generating predictions...")
+    scores = model.predict(X_test)
+    S_scores = scores[y_test == 1]
+    S_weights = w_test[y_test == 1]
+    B_scores = scores[y_test == 0]
+    B_weights = w_test[y_test == 0]
+
+    # Initialize the plot
+    plt.figure(figsize=(10, 6))
+
+    # Loop over all requested bin counts
+    for n_bins in n_bins_list:
+        print(f"\n--- Processing for {n_bins} bins ---")
+        N_obs, S, B = prepare_binned(n_bins, S_scores, S_weights, B_scores, B_weights, scores, w_test)
+        
+        mu_hat, mu_err, nll_min = fit_mu_binned(N_obs, S, B)
+        print(f"mu_hat: {mu_hat:.4f} ± {mu_err:.4f}")
+
+        # Generate NLL scan points
+        mu_values = np.linspace(0, max(5, 2 * mu_hat + 1), 500)
+        nll_values = np.array([NLL(mu, N_obs, S, B) for mu in mu_values])
+        
+        # Convert to Delta NLL
+        delta_nll = nll_values - nll_min
+        
+        # Mask out very large values to keep the plot readable
+        mask = delta_nll < 15
+        
+        # Plot this specific bin's curve
+        plt.plot(
+            mu_values[mask], 
+            delta_nll[mask], 
+            linewidth=2, 
+            label=rf"{n_bins} bins ($\delta\mu=\pm{mu_err:.3f}$)"
+        )
+
+    # Finalize the combined plot layout
+    plt.axhline(0.5, color="black", linestyle=":", label=r"$\Delta$NLL = 0.5 (1$\sigma$)")
+    plt.xlabel(r"$\mu$")
+    plt.ylabel(r"$\Delta$NLL")
+    plt.title("Profile Likelihood Scans: Impact of Binning Strategy")
+    plt.ylim(-0.2, 5) # Focused zoom on the minimums
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train BDT and plot multiple binned NLL scans.")
+    parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
+    # Allows passing a list of numbers from the terminal via: --n-bins-list 1 2 5 10 25
+    parser.add_argument("--n-bins-list", nargs='+', type=int, default=[1, 2, 5, 10, 25])
+    parser.add_argument("--test-size", type=float, default=0.3)
+    args = parser.parse_args()
+    
+    main(data_dir=args.data_dir, n_bins_list=args.n_bins_list, test_size=args.test_size)
