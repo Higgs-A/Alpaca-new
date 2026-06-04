@@ -145,41 +145,53 @@ def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_s
 
 
 def prepare_unbinned(S_scores, S_weights, B_scores, B_weights):
-    #création des PDFs continues grâce aux scores et poids des simulations
+    """Création des PDFs continues grâce aux scores et poids des simulations."""
     pdf_S = gaussian_kde(S_scores, weights=S_weights)
     pdf_B = gaussian_kde(B_scores, weights=B_weights)
-    #pour un nb total attendu mu=1
+    
+    # Pour un nombre total attendu mu=1
     N_S_expected = np.sum(S_weights)
     N_B_expected = np.sum(B_weights)
     return pdf_S, pdf_B, N_S_expected, N_B_expected
 
+
 def unbinned_NLL(mu, N_scores, N_weights, pdf_S, pdf_B, N_S_exp, N_B_exp):
-    '''Extended Unbinned Negative Log-Likelihood function'''
-    if mu < 0: # pénalité si minuit teste un mu négatif
+    """Extended Unbinned Negative Log-Likelihood function CORRIGÉE."""
+    if mu < 0:  # pénalité si minuit teste un mu négatif
         return 1e10  
-    # terme de Poisson étendu
+    
     N_expected_total = mu * N_S_exp + N_B_exp
-    # PDF évaluée pour chaque événement de Data
+    
+    # PDFs absolues
     f_S = pdf_S(N_scores)
     f_B = pdf_B(N_scores)
-    # Combinaison : vraisemblance pour chaque événement individuel
-    event_likelihood = (mu * N_S_exp * f_S + N_B_exp * f_B) / N_expected_total
-    nll_val = N_expected_total - np.sum(N_weights * np.log(event_likelihood))
+    
+    # terme de densité absolue pour chaque événement observé
+    prediction_par_evenement = mu * N_S_exp * f_S + N_B_exp * f_B
+    prediction_par_evenement = np.maximum(prediction_par_evenement, 1e-10) # Évite le log(0)
+    
+    # Extended Unbinned NLL
+    nll_val = N_expected_total - np.sum(N_weights * np.log(prediction_par_evenement))
     return nll_val
 
+
 def compute_mu_unbinned(mu0, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
+    """Ajustement du paramètre mu via Minuit."""
     pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights)
-    # minuit 
+    
     nll_func = lambda mu: unbinned_NLL(mu, N_scores, N_weights, pdf_S, pdf_B, N_S, N_B)
-    m = Minuit(nll_func, mu=1.0)
+    m = Minuit(nll_func, mu=mu0)
     m.limits["mu"] = (0, None)
     m.errordef = Minuit.LIKELIHOOD
     m.migrad() 
     m.hesse()  
-    # résultats 
+    
+    # Résultats en console
     print("mu_hat =", m.values["mu"])
     print("sigma_mu =", m.errors["mu"])
     print("NLL_min =", m.fval)
+    return m.values["mu"]
+
 
 # PLOTS 
 
@@ -535,64 +547,74 @@ def plot_binned_histograms(N_obs, S, B, mu_hat, N_bins=5, plot_show=True):
     if plot_show: plt.show()
 
 
+
+
+
+
 def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
-    '''Plot likelihood for unbinned data (Task 1b)'''
+    """Plot ΔNLL(μ) pour les données unbinned, parfaitement centré et parabolique."""
     def neg_ll(mu):
         return unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp)
  
-    mu_vals_full = np.linspace(0, 5, 1000)
+    # scan large pour trouver l'ordre de grandeur des intersections
+    mu_vals_full = np.linspace(max(0, mu_hat - 2.5), mu_hat + 2.5, 1000)
     nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
     nll_min = np.min(nll_vals_full)
     delta_nll_full = nll_vals_full - nll_min
  
-    mask = delta_nll_full < 20
-    mu_vals = mu_vals_full[mask]
-    delta_nll = delta_nll_full[mask]
- 
-    left_mask = mu_vals < mu_hat
-    right_mask = mu_vals > mu_hat
+    # séparation gauche/droite pour l'interpolation de l'erreur à 1-sigma
+    left_mask = mu_vals_full < mu_hat
+    right_mask = mu_vals_full > mu_hat
  
     try:
-        from scipy.interpolate import interp1d
-        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
-        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
+        left_interp = interp1d(delta_nll_full[left_mask], mu_vals_full[left_mask], bounds_error=False, fill_value="extrapolate")
+        right_interp = interp1d(delta_nll_full[right_mask], mu_vals_full[right_mask], bounds_error=False, fill_value="extrapolate")
         mu_lower = float(left_interp(0.5))
         mu_upper = float(right_interp(0.5))
         delta_mu = mu_upper - mu_lower
     except Exception as e:
-        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
+        mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.2
         print("Interpolation error:", e)
  
-    plt.figure(figsize=(9, 6))
+
+    demi_fenetre = max(0.5, 3.5 * (delta_mu / 2.0))
+    xmin = max(0, mu_hat - demi_fenetre)
+    xmax = mu_hat + demi_fenetre
+
+    mu_vals = np.linspace(xmin, xmax, 500)
+    delta_nll = np.array([neg_ll(mu) for mu in mu_vals]) - nll_min
+ 
+    plt.figure(figsize=(10, 6.5))
    
-    # courbe principale
-    plt.plot(mu_vals, delta_nll, label=r"Unbinned $\Delta$NLL", color="#8B008B", lw=2.5)
-    # 2. projection du minimum
-    plt.axvline(mu_hat, color="red", linestyle="--", lw=1.5, alpha=0.8)
-    # point au minimum
-    plt.plot(mu_hat, 0, 'ro', markersize=8, label=rf"Minimum $\hat\mu = {mu_hat:.3f}$")
-    plt.text(mu_hat + 0.05, 0.2, rf"$\hat\mu = {mu_hat:.3f}$", color="red", fontweight="bold", fontsize=11)
-    # 3. projection 1-sigma (incertitudes)
-    plt.axvline(mu_lower, color="green", linestyle="--", lw=1.2, alpha=0.7)
-    plt.axvline(mu_upper, color="green", linestyle="--", lw=1.2, alpha=0.7)
-    # ligne horizontale à Y = 0.5
-    plt.axhline(0.5, color="gray", linestyle=":", alpha=0.5)
-    # valeurs numériques pour + - sigma
-    plt.text(mu_lower - 0.35, 0.7, rf"$\mu_{{-1\sigma}} = {mu_lower:.3f}$", color="green", fontsize=10, fontweight="bold")
-    plt.text(mu_upper + 0.05, 0.7, rf"$\mu_{{+1\sigma}} = {mu_upper:.3f}$", color="green", fontsize=10, fontweight="bold")
-    # écart total entre les deux bornes à Y = 0.5
-    plt.hlines(0.5, mu_lower, mu_upper, colors="green", linestyles="-", lw=2,
-               label=rf"Incertitude $\delta\mu = {delta_mu:.3f}$")
+    err_moins = mu_hat - mu_lower
+    err_plus = mu_upper - mu_hat
    
-    plt.xlabel(r"$\mu$")
-    plt.ylabel(r"$\Delta$ Negative Log-Likelihood")
-    plt.title(rf"Profile Unbinned Likelihood Scan: $\delta\mu$ = {delta_mu:.3f}")
+    label_courbe = rf"Extended $\Delta$NLL : $\mu = {mu_hat:.3f}_{{-{err_moins:.3f}}}^{{+{err_plus:.3f}}}$ | $\Delta\mu_{{1\sigma}} = {delta_mu:.3f}$"
+    plt.plot(mu_vals, delta_nll, label=label_courbe, color="#8B008B", lw=2.5)
+    
+    plt.axvline(mu_hat, color="red", linestyle="--", lw=1.5, alpha=0.6)
+    plt.plot(mu_hat, 0, 'ro', markersize=8)
+    
+    plt.axhline(0.5, color="gray", linestyle="-.", alpha=0.5, label=r"$\Delta$NLL = 0.5 ($\pm 1\sigma$)")
+    
+    plt.axvline(mu_lower, color="green", linestyle=":", lw=1.5, alpha=0.8)
+    plt.axvline(mu_upper, color="green", linestyle=":", lw=1.5, alpha=0.8)
+    plt.scatter([mu_lower, mu_upper], [0.5, 0.5], color="green", s=50, zorder=5)
+    
+    plt.hlines(0.5, mu_lower, mu_upper, colors="green", linestyles="-", lw=2)
    
-    # limites de l'axe
-    plt.xlim(max(0, mu_hat - 1.5), mu_hat + 1.5)
-    plt.ylim(-0.5, 10)
+    plt.text(mu_hat + (demi_fenetre * 0.03), 0.15, rf"$\hat{{\mu}} = {mu_hat:.3f}$", color="red", fontweight="bold", fontsize=10)
+    plt.text(mu_lower - (demi_fenetre * 0.25), 0.65, rf"$\mu_{{-1\sigma}} = {mu_lower:.3f}$", color="green", fontsize=9, fontweight="bold")
+    plt.text(mu_upper + (demi_fenetre * 0.03), 0.65, rf"$\mu_{{+1\sigma}} = {mu_upper:.3f}$", color="green", fontsize=9, fontweight="bold")
    
-    plt.legend(loc="upper right")
+    plt.xlabel(r"Force du Signal $\mu$", fontsize=11)
+    plt.ylabel(r"$\Delta$NLL = NLL - $\text{NLL}_{min}$", fontsize=11)
+    plt.title(r"Extended Unbinned Profile Likelihood Scan (Parfaitement Centré)", fontsize=12, fontweight='bold', pad=12)
+   
+    plt.xlim(xmin, xmax)
+    plt.ylim(-0.15, 4.5) 
+   
+    plt.legend(loc="upper center", fontsize=10, framealpha=0.95)
     plt.grid(True, linestyle="--", alpha=0.3)
     plt.tight_layout()
    
@@ -601,7 +623,7 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
 
 
 def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
-    '''plot for unbinned distributions (Task 1b) (smoothed shape)'''
+    """Plot des formes lissées des distributions (KDE)."""
     plt.figure(figsize=(8, 5))
     counts, bins, _ = plt.hist(Data_scores, bins=40, weights=Data_weights, alpha=0.3, label="Observed Data", color="gray", edgecolor="black")
     
@@ -621,7 +643,6 @@ def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp
     plt.grid(True)
     plt.tight_layout()
     if plot_show: plt.show()
-
 
 
 
