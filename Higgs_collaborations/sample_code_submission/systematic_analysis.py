@@ -306,6 +306,10 @@ def calcul_prediction_totale(parametres, saved_info,num_bins=num_bins):
 
 
 def param_fitter(model, training_dict, num_bins=num_bins):
+    """ model : votre modèle entrainé (exemple my_model.model )
+        training_dict : votre dictionnaire d'entrainement (exemple my_model.training_set)
+        num_bins : le nombre de bins que vous avez choisi pour votre histogramme
+    """
     saved_info = generer_saved_info(model, training_dict, num_bins=num_bins)
 
 
@@ -341,3 +345,6 @@ def param_fitter(model, training_dict, num_bins=num_bins):
     
     return obtenir_prediction_tous_bins
     
+
+obtentio_prediction_totale= param_fitter(model, training_dict, num_bins=num_bins)
+prediction_S, prediction_B = obtentio_prediction_totale(tes=1.0, jes=1.0, bnorm=1.0, smet=0)
