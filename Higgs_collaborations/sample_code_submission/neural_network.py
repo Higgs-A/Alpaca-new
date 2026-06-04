@@ -21,14 +21,15 @@ from sklearn.preprocessing import StandardScaler
 
 class NeuralNetwork:
 
-    def __init__(self, n_features=None):
+    def __init__(self, n_features=None, train_data = None):
         self.model  = None
         self.scaler = StandardScaler()
 
         self._predictions  = None
         self._test_labels  = None
         self._test_weights = None
-
+        if n_features is None and train_data is not None :
+            n_features = train_data.shape[1]
         if n_features is not None:
             self._initialize_model(n_features)
 
@@ -62,8 +63,8 @@ class NeuralNetwork:
     def fit(self, train_data, y_train, weights_train=None):
         """Train the model."""
         model_dir = os.path.dirname(os.path.abspath(__file__))
-      self.model = load_model(os.path.join(model_dir, "model.keras"))
-      self.scaler = joblib.load(os.path.join(model_dir, "scaler.pkl"))
+        self.model = load_model(os.path.join(model_dir, "model.keras"))
+        self.scaler = joblib.load(os.path.join(model_dir, "scaler.pkl"))
 
     def predict(self, test_data, labels=None, weights=None):
         self._predictions = self.model.predict(
