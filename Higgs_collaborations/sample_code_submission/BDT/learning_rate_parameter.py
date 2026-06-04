@@ -90,8 +90,6 @@ if __name__ == "__main__":
     # 1. Récupération directe des données via ton module externe 'get_data.py'
     X_train, X_test, y_train, y_test, weights_train, weights_test = get_clean_splits()
     
-    # Optionnel de sécurité : Si l'entraînement complet à 1.4 million de lignes prend trop de temps,
-    # tu peux décommenter les 3 lignes ci-dessous pour faire ton étude de LR sur un échantillon plus rapide (ex: 150k lignes)
     # n_sample = 150000
     # X_train, y_train, weights_train = X_train.iloc[:n_sample], y_train.iloc[:n_sample], weights_train.iloc[:n_sample]
 

@@ -79,10 +79,10 @@ def grid_search_ams_and_threshold(X_train, y_train, weights_train):
                 test_model.model.set_params(learning_rate=lr, early_stopping_rounds=stopping)
                 test_model.fit(X_tr_fold, y_tr_fold, weights=w_tr_fold)
                 
-                # Prédiction (Probabilités de Signal)
+                # Prédiction 
                 y_pred_val = test_model.predict(X_val_fold)
                 
-                # --- CALCUL AMS ET SEUIL ---
+                # -CALCUL AMS ET SEUIL
                 z_max, thresh_opt = get_best_significance_and_threshold(
                     y_true=y_val_fold.to_numpy(), 
                     y_score=y_pred_val, 
@@ -102,7 +102,7 @@ def grid_search_ams_and_threshold(X_train, y_train, weights_train):
     df_z = pd.DataFrame(z_matrix, index=learning_rates, columns=stopping_rounds)
     df_thresh = pd.DataFrame(threshold_matrix, index=learning_rates, columns=stopping_rounds)
     
-    # --- AFFICHAGE DE LA HEATMAP DES SCORES Z (AMS) ---
+    # AFFICHAGE DE LA HEATMAP DES SCORES Z (AMS)
     plt.figure(figsize=(10, 5))
     sns.heatmap(df_z, annot=True, fmt=".2f", cmap="Purples", cbar_kws={'label': "Signification d'Asimov (Z)"})
     plt.title("Grid Search : Signification d'Asimov Maximale (Z)", fontsize=12, fontweight='bold', pad=15)
@@ -111,7 +111,7 @@ def grid_search_ams_and_threshold(X_train, y_train, weights_train):
     plt.tight_layout()
     plt.show()
 
-    # --- AFFICHAGE DE LA HEATMAP DES SEUILS OPTIMAUX ---
+    # AFFICHAGE DE LA HEATMAP DES SEUILS OPTIMAUX
     plt.figure(figsize=(10, 5))
     sns.heatmap(df_thresh, annot=True, fmt=".2f", cmap="Oranges", cbar_kws={'label': "Seuil de Coupure Optimal (0 à 1)"})
     plt.title("Evolution du Seuil de Coupure Optimal selon les paramètres", fontsize=12, fontweight='bold', pad=15)

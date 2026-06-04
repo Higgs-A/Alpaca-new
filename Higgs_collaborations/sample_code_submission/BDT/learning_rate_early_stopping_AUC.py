@@ -81,7 +81,7 @@ def grid_search_lr_and_stopping(X_train, y_train, weights_train):
     print(f" -> Validation ROC AUC Moyen : {best_auc:.4f}")
     print("="*45)
     
-    # --- AFFICHAGE DE LA HEATMAP ---
+    # AFFICHAGE DE LA HEATMAP 
     plt.figure(figsize=(9, 6))
     sns.heatmap(df_scores, annot=True, fmt=".4f", cmap="YlGnBu", cbar_kws={'label': 'Validation ROC AUC'})
     plt.title("Grid Search : Interaction Learning Rate vs Early Stopping", fontsize=12, fontweight='bold', pad=15)
@@ -96,13 +96,12 @@ if __name__ == "__main__":
     # 1. Chargement des données globales
     X_train, _, y_train, _, weights_train, _ = get_clean_splits()
     
-    # 2. Sous-échantillon pour garder un temps de calcul raisonnable (ex: 150k lignes)
-    # Même si c'est "plus long", 150k à 200k lignes suffisent amplement à donner la vérité statistique de la grille.
+    # 2. Sous-échantillon pour garder un temps de calcul raisonnable 
     n_sample = 150000
     print(f"Sélection de {n_sample} événements pour la Grid Search...")
     X_tr_opti = X_train.iloc[:n_sample]
     y_tr_opti = y_train.iloc[:n_sample]
     w_tr_opti = weights_train.iloc[:n_sample]
 
-    # 3. Lancement de la grille exhaustive (5 LR * 4 Stopping = 20 combinaisons * 3 plis = 60 entraînements)
+    # 3. Lancement de la grille exhaustive
     grid_search_lr_and_stopping(X_tr_opti, y_tr_opti, w_tr_opti)
