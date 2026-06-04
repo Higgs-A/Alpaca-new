@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 # Importations de vos fichiers locaux
 from model import Model
 from HiggsML.systematics import systematics
-from systematic_analysis import tes_fitter, jes_fitter
+# from systematic_analysis import tes_fitter, jes_fitter
 
 # Configuration des valeurs nominales par défaut
 NOMINALS = {
@@ -36,7 +36,7 @@ PARAM_MAPPING = {
 }
 
 # nombre de bins 
-num_bins = 6
+num_bins = 20
 
 # ==============================================================================
 # FONCTION DEMANDEE PAR LE PROFESSEUR : GENERATION DE SAVED_INFO
@@ -290,47 +290,55 @@ def N_total_bin(bin_i, tes, jes, bnorm, smet, saved_info, classe="S"):
     # Sécurité physique : un nombre d'événements ne peut pas être négatif
     return n_total
 
-# Exemple de ce que fera le groupe STAT :
-def calcul_prediction_totale(parametres, saved_info,num_bins=num_bins):
-    # parametres = [tes, jes, bnorm, smet]
-    pred_S = [N_total_bin(i, *parametres, saved_info, classe="S") for i in range(num_bins)]
-    pred_B = [N_total_bin(i, *parametres, saved_info, classe="B") for i in range(num_bins)]
-    return pred_S, pred_B
+
+def prediction_totale_S (tes, jes, bnorm, smet, saved_info,num_bins=num_bins):
+    return [N_total_bin(i, tes, jes, bnorm, smet, saved_info, classe="S") for i in range(num_bins)]
+
+def prediction_totale_B (tes, jes, bnorm, smet, saved_info,num_bins=num_bins):
+    return [N_total_bin(i, tes, jes, bnorm, smet, saved_info, classe="B") for i in range(num_bins)]
 
 
 
-def verifier_interpolation(model, training_dict, saved_info, syst_name="tes"):
+import copy
+
+def verifier_interpolation(model, training_dict, saved_info, syst_name="tes", n_points=20):
     """
-    Vérifie visuellement si la droite d'interpolation passe bien par les points réels.
+    Version Haute Résolution :
+    - n_points : Nombre de simulations réelles (plus c'est élevé, plus c'est précis mais lent)
+    - Affiche TOUS les bins de saved_info de manière dynamique
     """
-    # 1. Configuration des paramètres selon la systématique
     config = {
-        "tes": {"min": 0.97, "max": 1.03, "nom": 1.0, "arg": "tes"},
-        "jes": {"min": 0.97, "max": 1.03, "nom": 1.0, "arg": "jes"},
-        "bnorm": {"min": 0.90, "max": 1.10, "nom": 1.0, "arg": "bkg_scale"},
-        "smet": {"min": 0, "max": 3.0, "nom": 0.0, "arg": "soft_met"}
+        "tes": {"min": 0.95, "max": 1.05, "nom": 1.0, "arg": "tes", "sigma_p": 1.03, "sigma_m": 0.97},
+        "jes": {"min": 0.95, "max": 1.05, "nom": 1.0, "arg": "jes", "sigma_p": 1.03, "sigma_m": 0.97},
+        "bnorm": {"min": 0.85, "max": 1.15, "nom": 1.0, "arg": "bkg_scale", "sigma_p": 1.05, "sigma_m": 0.95},
+        "smet": {"min": -5.0, "max": 5.0, "nom": 0.0, "arg": "soft_met", "sigma_p": 3.0, "sigma_m": -3.0}
     }
     cfg = config[syst_name]
+    
+    # On récupère le nombre de bins réel du dictionnaire
     num_bins = len(saved_info["S"][syst_name])
     
-    # 2. Calcul des "Points Réels" (La vérité du modèle)
-    test_values = np.linspace(cfg["min"], cfg["max"], 10)
+    # 1. Calcul des points réels (Lent car fait appel au modèle n_points fois)
+    test_values = np.linspace(cfg["min"], cfg["max"], n_points)
     real_deltas_s = []
 
-    print(f"Calcul des points réels pour vérification {syst_name.upper()}...")
+    print(f"--- Vérification HR {syst_name.upper()} ({n_points} points, {num_bins} bins) ---")
     
-    # Référence nominale
-    set_nom = systematics(training_dict.copy(), **{cfg['arg']: cfg['nom']})
+    # Calcul du Nominal de référence
+    set_nom = systematics(copy.deepcopy(training_dict), **{cfg['arg']: cfg['nom']})
     scores_nom = np.array(model.predict(set_nom["data"])).ravel()
     weights_nom = np.array(set_nom["weights"]).ravel()
-    is_sig_nom = (np.array(set_nom["labels"]).ravel() == 1.0)
+    labels_nom = np.array(set_nom["labels"]).ravel()
+    is_sig_nom = (labels_nom == 1.0)
     
     bins_fixes = np.linspace(np.min(scores_nom), np.max(scores_nom), num_bins + 1)
     nom_counts, _ = np.histogram(scores_nom[is_sig_nom], bins=bins_fixes, weights=weights_nom[is_sig_nom])
 
     for val in test_values:
-        set_shift = systematics(training_dict.copy(), **{cfg['arg']: val})
-        # Correction manuelle pour le bnorm
+        # On utilise deepcopy pour protéger le dictionnaire entre chaque simulation
+        set_shift = systematics(copy.deepcopy(training_dict), **{cfg['arg']: val})
+        
+        # Correction manuelle spécifique pour le bnorm
         if syst_name == "bnorm":
             labels = np.array(set_shift["labels"]).ravel()
             set_shift["weights"][labels == 0.0] *= val
@@ -344,37 +352,39 @@ def verifier_interpolation(model, training_dict, saved_info, syst_name="tes"):
     
     real_deltas_s = np.array(real_deltas_s)
 
-    # 3. Affichage des graphiques (Grille de 2x3 pour 6 bins)
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-    axes = axes.flatten()
+    # 2. Configuration dynamique de la grille de graphiques
+    ncols = 4 if num_bins > 4 else num_bins
+    nrows = int(np.ceil(num_bins / ncols))
     
-    x_range = np.linspace(cfg["min"], cfg["max"], 100)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(5*ncols, 4*nrows))
+    axes = np.array(axes).flatten() # Sécurité si 1 seul bin
+    
+    x_interp_range = np.linspace(cfg["min"], cfg["max"], 100)
 
-    for i in range(num_bins // 2, num_bins):
+    for i in range(num_bins):
         ax = axes[i]
         
-        # A. Tracer les points réels
-        ax.scatter(test_values, real_deltas_s[:, i], color='black', label='Points réels (Modèle)', zorder=3)
+        # A. Points réels (Simulations BDT)
+        ax.scatter(test_values, real_deltas_s[:, i], color='black', s=20, label='BDT Real Points', zorder=3)
         
-        # B. Tracer la droite d'interpolation (votre fonction Delta_gamma)
-        # On recalcule la pente à partir de saved_info
+        # B. Droite d'interpolation (Modèle Linéaire)
         d_plus, d_minus = saved_info["S"][syst_name][i]
-        # On récupère les bornes sigma utilisées pour générer saved_info
-        if syst_name == "tes": sigma_plus, sigma_minus = 1.03, 0.97
-        elif syst_name == "bnorm": sigma_plus, sigma_minus = 1.05, 0.95
+        pente = (d_plus - d_minus) / (cfg["sigma_p"] - cfg["sigma_m"])
+        y_interp = pente * (x_interp_range - cfg["nom"])
         
-        pente = (d_plus - d_minus) / (sigma_plus - sigma_minus)
-        y_interp = pente * (x_range - cfg["nom"])
+        ax.plot(x_interp_range, y_interp, color='red', lw=2, label='Linear Model')
         
-        ax.plot(x_range, y_interp, '--', color='red', alpha=0.8, label='Droite Interpolation')
-        
-        ax.set_title(f"Bin {i+1}")
-        ax.axhline(0, color='grey', lw=0.5)
-        ax.axvline(cfg["nom"], color='grey', lw=0.5)
-        if i == 0: ax.legend()
+        ax.set_title(f"Bin {i+1}", fontweight='bold')
+        ax.axhline(0, color='grey', lw=0.8, alpha=0.5)
+        ax.axvline(cfg["nom"], color='grey', lw=0.8, alpha=0.5)
+        if i == 0: ax.legend(fontsize='small')
 
-    plt.suptitle(f"Validation de l'interpolation linéaire : {syst_name.upper()} (SIGNAL)", fontsize=18)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    # On cache les axes vides si la grille est plus grande que le nombre de bins
+    for j in range(i + 1, len(axes)):
+        axes[j].axis('off')
+
+    plt.suptitle(f"VALIDATION LINÉARITÉ HAUTE RÉSOLUTION : {syst_name.upper()}", fontsize=20, y=1.02)
+    plt.tight_layout()
     plt.show()
 
     # Vérification de la validité de votre modèle de droites
