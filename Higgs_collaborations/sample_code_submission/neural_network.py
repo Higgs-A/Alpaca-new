@@ -62,9 +62,10 @@ class NeuralNetwork:
 
     def fit(self, train_data, y_train, weights_train=None):
         """Train the model."""
-        model_dir = os.path.dirname(os.path.abspath(__file__))
-        from pathlib import Path
-        model_dir = Path("weighted_best_model")
+        #model_dir = os.path.dirname(os.path.abspath(__file__))
+        #from pathlib import Path
+        #model_dir = Path("weighted_best_model")
+        model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "weighted_best_model")
         print(model_dir)
         self.model = load_model(os.path.join(model_dir, "model.keras"))
         self.scaler = joblib.load(os.path.join(model_dir, "scaler.pkl"))
