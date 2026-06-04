@@ -5,24 +5,29 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
 from scipy.stats import chisquare
-from HiggsML.datasets import download_dataset, Data
-from HiggsML.systematics import systematics
 from matplotlib.font_manager import FontProperties
-
-# Ensure the package containing HiggsML is on sys.path so we can import HiggsML.datasets
-
-black_swan_pkg_path = r'c:\Users\geoff\Documents\Centrale\cours_centrale\ST4\EI\black_swan_pkg'
-if black_swan_pkg_path not in sys.path:
-    sys.path.insert(0, black_swan_pkg_path)
-from HiggsML.datasets import download_dataset
-
-# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
-# from datasets import download_dataset
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
+
+#Geoffroy--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# from HiggsML.datasets import download_dataset, Data
+# from HiggsML.systematics import systematics
+# Ensure the package containing HiggsML is on sys.path so we can import HiggsML.datasets
+# black_swan_pkg_path = r'c:\Users\geoff\Documents\Centrale\cours_centrale\ST4\EI\black_swan_pkg'
+# if black_swan_pkg_path not in sys.path:
+#     sys.path.insert(0, black_swan_pkg_path)
+# from HiggsML.datasets import download_dataset
+
+#Youri--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
+from datasets import download_dataset
+
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Download dataset later (we change working dir first); keep this line commented to avoid duplicate downloads
 # data = download_dataset("blackSwan_data")
@@ -53,7 +58,7 @@ def data_jet_two(data):
     data_jet_two = data[data["PRI_n_jets"] == 2]
     return data_jet_two
 
-def feature_corrilations(data):
+def feature_corrilations(data, show=False):
     
     
     # Validate input
@@ -92,42 +97,57 @@ def feature_corrilations(data):
     plt.yticks(fontsize=6, rotation=0)
     plt.title("Correlation matrix of features", fontsize=12)
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
     return corr_matrix
     
-feature_corrilations(data_jet_one(data_set))
-feature_corrilations(data_jet_zero(data_set))
-feature_corrilations(data_jet_two(data_set))
+# feature_corrilations(data_jet_one(data_set))
+# feature_corrilations(data_jet_zero(data_set))
+# feature_corrilations(data_jet_two(data_set))
    
-print(data_set.columns)
+# print(data_set.columns)
 # print(data_set["detailed_labels"])
 # print(data_set["weights"])
 # print(data_set["labels"])
 
-def feature_signal_background_correlations(data):
-    
-
-    sns.set_theme(rc={"figure.figsize": (10, 10)}, style="whitegrid")
-    rows={}
+def feature_signal_background_correlations(data, show=False):
+    sns.set_theme(style="whitegrid")
+    rows = {}
     num_cols = data.shape[1]
+    feature_names = list(data.columns)
 
-    for i in range(16):       
-        corrMatrix = data.iloc[:, [i, 18]].corr()
-        rows[f"col{i}"]= corrMatrix.iloc[0, 1]
-    for i in range(19, num_cols):       
-        corrMatrix = data.iloc[:, [18, i]].corr()
-        rows[f"col{i}"]= corrMatrix.iloc[0, 1]
-    dfplot = pd.DataFrame([rows])
+    for i in range(16):
+        corr_matrix = data.iloc[:, [i, 18]].corr()
+        rows[feature_names[i]] = corr_matrix.iloc[0, 1]
 
+    for i in range(19, num_cols):
+        corr_matrix = data.iloc[:, [18, i]].corr()
+        rows[feature_names[i]] = corr_matrix.iloc[0, 1]
 
-    # print("Features to Signal-Background correlation matrix")
-    # sns.heatmap(dfplot, annot=True)
-    # plt.title("Correlation matrix of features")
-    # plt.show()
+    dfplot = pd.DataFrame({"Correlation with signal/background": list(rows.values())}, index=list(rows.keys()))
+
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(
+        dfplot,
+        annot=True,
+        fmt=".2f",
+        cmap="coolwarm",
+        linewidths=0.5,
+        linecolor="white",
+        annot_kws={"size": 8},
+        cbar_kws={"label": "Correlation", "shrink": 0.9},
+    )
+    plt.title("Correlation of each feature with signal/background", fontsize=12)
+    plt.xticks(rotation=0)
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    if show:
+        plt.show()
+
     #print(dfplot)
     return dfplot
-    del dfplot
-#feature_signal_background_correlations(data_set)
+
+feature_signal_background_correlations(data_set, show=True)
 
 
 features_all = [
@@ -335,13 +355,15 @@ def minimal_dependent_features(data):
     return data.columns
 
 
-if __name__ == "__main__":
-    # When run as a script, show the correlation matrix for the training set
-    feature_corrilations(data_set)
+# if __name__ == "__main__":
+#     # When run as a script, show the correlation matrix for the training set
+#     feature_corrilations(data_set)
 
 
-matrix_line = feature_signal_background_correlations(data_set)
-matrix_square = feature_corrilations(data_set)
+# Les matrices sont calculées sans affichage graphique ici.
+# Si vous voulez les visualiser, appelez les fonctions avec show=True ou décommentez les lignes ci-dessous.
+matrix_line = feature_signal_background_correlations(data_set, show=False)
+matrix_square = feature_corrilations(data_set, show=False)
 
 def value_signal(data_set, lst):
     
@@ -393,30 +415,30 @@ def engineering_angles(data):
     return df
 
 def to_cartesian(data):
-    particule_prefixes = ['PRI_lep', 'PRI_had', 'PRI_jet_leading', 'PRI_jet_subleading']
+    particle_prefixes = ['PRI_lep', 'PRI_had', 'PRI_jet_leading', 'PRI_jet_subleading']
     df = data.copy()
-    for particle_prefix in particule_prefixes:
+
+    for particle_prefix in particle_prefixes:
         pt = df[f'{particle_prefix}_pt']
         phi = df[f'{particle_prefix}_phi']
         eta = df[f'{particle_prefix}_eta']
-    
+
         df[f'{particle_prefix}_px'] = pt * np.cos(phi)
         df[f'{particle_prefix}_py'] = pt * np.sin(phi)
         df[f'{particle_prefix}_pz'] = pt * np.sinh(eta)
-    
+
     return df
 
 
-
-def conversion_numbers_into_names(score, indices):
-    feature_cols = [col for col in data_cleaned.columns if col.startswith('PRI_') or col.startswith('DER_')]
+def conversion_numbers_into_names(score, indices, data_frame):
+    feature_cols = [col for col in data_frame.columns if col.startswith('PRI_') or col.startswith('DER_')]
     selected_features = [feature_cols[i] for i in indices]
     return score, selected_features
 
 
 # systematic_dependence(Data("c:/Users/noahl/Documents/EI_PP"),True)
-data = Data("c:/Users/noahl/Documents/EI_PP")
-data.load_train_set()
-dfmod = data.get_train_set()
-df_lowbias = dfmod.drop(columns=["PRI_had_pt", "PRI_jet_subleading_pt", "DER_mass_vis", "DER_pt_ratio_lep_had"])
-df_lowcorr = dfmod.drop(columns=["PRI_lep_phi","PRI_had_phi","PRI_jet_subleading_phi","PRI_met_phi"])
+# data = Data("c:/Users/noahl/Documents/EI_PP")
+# data.load_train_set()
+# dfmod = data.get_train_set()
+# df_lowbias = dfmod.drop(columns=["PRI_had_pt", "PRI_jet_subleading_pt", "DER_mass_vis", "DER_pt_ratio_lep_had"])
+# df_lowcorr = dfmod.drop(columns=["PRI_lep_phi","PRI_had_phi","PRI_jet_subleading_phi","PRI_met_phi"])
