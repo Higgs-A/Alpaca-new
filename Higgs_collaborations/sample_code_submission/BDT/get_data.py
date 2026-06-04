@@ -10,16 +10,17 @@ def get_clean_splits():
     Retourne:
         X_train, X_test, y_train, y_test, w_train, w_test
     """
-    # 1. Chargement des données via la librairie officielle
+    # Chargement des données via la librairie officielle
     data = download_dataset("blackSwan_data")
     data.load_train_set()
     data_set = data.get_train_set()
-    # 2. Extraction brute des colonnes cibles et nettoyage de X
+    data_set = data_set.drop(columns=["PRI_lep_eta","PRI_jet_all_pt","DER_deltar_had_lep","DER_pt_ratio_lep_had"])
+    # Extraction brute des colonnes cibles et nettoyage de X
     y = data_set["labels"]
     w = data_set["weights"]
     X = data_set.drop(columns=["labels", "weights", "detailed_labels"], errors="ignore")
 
-    # 3. Découpage macro (80% Train / 20% Test local)
+    # Découpage macro (80% Train / 20% Test local)
     X_train, X_test, y_train, y_test, w_train, w_test = train_test_split(
         X, y, w, test_size=0.20, random_state=42, stratify=y
     )

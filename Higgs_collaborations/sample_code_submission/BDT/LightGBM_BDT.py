@@ -23,13 +23,13 @@ class LightGBM_BDT:
     def fit(self, train_data, labels, weights=None):
         val_size = 0.1
         
-        # 1. Split avec gestion des poids (Identique à ta logique)
+        # Split avec gestion des poids 
         if weights is not None:
             X_tr, X_val, y_tr, y_val, w_tr, w_val = train_test_split(
                 train_data, labels, weights,
                 test_size=val_size, random_state=42, stratify=labels
             )
-            # Normalisation des poids (logique du prof)
+            # Normalisation des poids 
             class_weights_tr = (w_tr[y_tr == 0].sum(), w_tr[y_tr == 1].sum())
             for i in [0, 1]:
                 if class_weights_tr[i] > 0:
@@ -43,11 +43,11 @@ class LightGBM_BDT:
             )
             w_tr = w_val = None
 
-        # 2. Standardisation
+        # Standardisation
         X_tr = self.scaler.fit_transform(X_tr)
         X_val = self.scaler.transform(X_val)
 
-        # 3. Entraînement avec Early Stopping (Callback moderne)
+        # Entraînement avec Early Stopping 
         self.model.fit(
             X_tr, y_tr,
             sample_weight=w_tr,

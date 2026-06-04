@@ -17,10 +17,10 @@ class Sklearn_GBDT:
         )
 
     def fit(self, train_data, labels, weights=None):
-        # 1. Standardisation (le scaler apprend sur le train uniquement)
+        # Standardisation 
         X_tr = self.scaler.fit_transform(train_data)
         
-        # 2. Gestion des poids (Normalisation identique à ton XGBoost)
+        # Gestion des poids 
         # On égalise la somme des poids Signal et Background
         if weights is not None:
             w_tr = weights.copy()
@@ -31,8 +31,7 @@ class Sklearn_GBDT:
         else:
             w_tr = None
 
-        # 3. Entraînement
-        # HistGradientBoosting gère l'early stopping et la validation en interne
+        # Entraînement
         self.model.fit(X_tr, labels, sample_weight=w_tr)
         
 

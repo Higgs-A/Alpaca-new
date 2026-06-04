@@ -30,7 +30,7 @@ def training_tree(model_class=None, model_path=None):
     if model_path is None:
         model_path = f"{model_class.__name__}_checkpoint.joblib"
 
-    # 1. Chargement si le checkpoint existe
+    # Chargement si le checkpoint existe
     if os.path.exists(model_path):
         reponse = input(f"Checkpoint trouvé : {model_path}. Charger ? (o/n) : ").lower()
         if reponse == 'o':
@@ -39,7 +39,7 @@ def training_tree(model_class=None, model_path=None):
             return cp['X_train'], cp['X_test'], cp['y_train'], cp['y_test'], \
                    cp['w_train'], cp['w_test'], cp['model'], cp['predictions']
 
-    # 2. Sinon : Entraînement complet
+    # Sinon : Entraînement complet
     print("Début de la récupération des données et entraînement...")
     X_train, X_test, y_train, y_test, w_train, w_test = get_clean_splits()
     
@@ -47,7 +47,7 @@ def training_tree(model_class=None, model_path=None):
     bdt.fit(X_train, y_train, weights=w_train)
     predictions = bdt.predict(X_test)
 
-    # 3. Sauvegarde du contexte complet
+    # Sauvegarde du contexte complet
     checkpoint = {
         'model': bdt,
         'X_train': X_train, 'X_test': X_test,
