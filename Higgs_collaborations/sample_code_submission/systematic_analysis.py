@@ -169,11 +169,15 @@ def calcul_prediction_totale(parametres, saved_info,num_bins=num_bins):
     return pred_S, pred_B
 
 
-def param_fitter(model, training_dict, num_bins=num_bins):
+def param_fitter_S(model, training_dict, num_bins=num_bins):
+    """ model : votre modèle entrainé (exemple my_model.model )
+        training_dict : votre dictionnaire d'entrainement (exemple my_model.training_set)
+        num_bins : le nombre de bins que vous avez choisi pour votre histogramme
+    """
     saved_info = generer_saved_info(model, training_dict, num_bins=num_bins)
 
 
-    def obtenir_prediction_tous_bins(tes=1.0, jes=1.0, bnorm=1.0, smet=0.0):
+    def obtenir_prediction_tous_bins_S(tes=1.0, jes=1.0, bnorm=1.0, smet=0.0):
         """
         Calcule la prédiction finale (Nominal + Deltas) pour l'intégralité des bins
         pour le Signal et le Background.
@@ -187,7 +191,6 @@ def param_fitter(model, training_dict, num_bins=num_bins):
             tuple: (liste_S, liste_B) contenant les prédictions pour chaque bin.
         """
         pred_S = []
-        pred_B = []
 
         # On parcourt tous les bins un par un
         for i in range(num_bins):
@@ -196,12 +199,41 @@ def param_fitter(model, training_dict, num_bins=num_bins):
                               saved_info=saved_info, classe="S")
             pred_S.append(n_s)
 
-            # Calcul pour le Background dans le bin i
+        return pred_S
+    
+    return obtenir_prediction_tous_bins_S
+
+def param_fitter_B(model, training_dict, num_bins=num_bins):
+    """ model : votre modèle entrainé (exemple my_model.model )
+        training_dict : votre dictionnaire d'entrainement (exemple my_model.training_set)
+        num_bins : le nombre de bins que vous avez choisi pour votre histogramme
+    """
+    saved_info = generer_saved_info(model, training_dict, num_bins=num_bins)
+
+
+    def obtenir_prediction_tous_bins_B(tes=1.0, jes=1.0, bnorm=1.0, smet=0.0):
+        """
+        Calcule la prédiction finale (Nominal + Deltas) pour l'intégralité des bins
+        pour le Signal et le Background.
+
+        Args:
+            saved_info (dict): Le dictionnaire généré par generer_saved_info
+            tes, jes, bnorm, smet (float): Les valeurs courantes des paramètres systématiques (parametre)
+            num_bins (int): Le nombre de bins total (par défaut configuré au début de ton script)
+
+        Returns:
+            tuple: (liste_S, liste_B) contenant les prédictions pour chaque bin.
+        """
+        pred_B = []
+
+        # On parcourt tous les bins un par un
+        for i in range(num_bins):
+            # Calcul pour le Signal dans le bin i
             n_b = N_total_bin(bin_i=i, tes=tes, jes=jes, bnorm=bnorm, smet=smet, 
                               saved_info=saved_info, classe="B")
             pred_B.append(n_b)
 
-        return pred_S, pred_B
+        return pred_B
     
-    return obtenir_prediction_tous_bins
+    return obtenir_prediction_tous_bins_B
     
