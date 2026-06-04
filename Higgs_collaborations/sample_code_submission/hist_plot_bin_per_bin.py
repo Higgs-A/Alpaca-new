@@ -8,7 +8,163 @@ from sklearn.model_selection import train_test_split
 # Importations de vos fichiers locaux
 from model import Model
 from HiggsML.systematics import systematics
-from systematic_analysis import tes_fitter, jes_fitter 
+from systematic_analysis import tes_fitter, jes_fitter, met_fitter, signal_bck, get_data
+
+
+###########################################################################by beta
+
+def visualise_tes(transformateur, data_set, model, bin_index: int, n_bins: int = 100):
+    """
+    Visualise l'évolution d'un bin spécifique en fonction de la valeur de TES.
+    Compare la vérité terrain (scan complet) et la prédiction du transformateur.
+    """
+    print(f"=== Génération de la visualisation pour le bin n°{bin_index} ===")
+    
+    # 1. Définir une plage de TES fine pour tracer une belle courbe prédictive continue
+    tes_fine_range = np.linspace(0.9, 1.1, 200)
+    
+    # 2. Récupérer l'histogramme nominal de validation (20%) comme base de calcul
+    val_data, labels_val, weights_val = get_data(data_set)[3:]
+    score_val = model.predict(val_data)
+    s_sc_v, s_w_v, b_sc_v, b_w_v = signal_bck(score_val, labels_val.to_numpy(), weights_val.to_numpy())
+    
+    s_hist_val, _ = np.histogram(s_sc_v, bins=n_bins, range=(0, 1), weights=s_w_v, density=False)
+    b_hist_val, _ = np.histogram(b_sc_v, bins=n_bins, range=(0, 1), weights=b_w_v, density=False)
+    
+    # 3. Calculer les prédictions du transformateur pour toute la plage de TES
+    pred_signal_bin = []
+    pred_bkg_bin = []
+    
+    for t in tes_fine_range:
+        comp_s, comp_b = transformateur((s_hist_val, b_hist_val), t)
+        pred_signal_bin.append(comp_s[bin_index])
+        pred_bkg_bin.append(comp_b[bin_index])
+        
+    # 4. Échantillonner quelques "vrais" points réels pour la comparaison (ex: 15 points du détecteur)
+    tes_scan_points = np.linspace(0.97, 1.03, 15)
+    true_signal_bin = []
+    true_bkg_bin = []
+    
+    print("Échantillonnage des données réelles du détecteur...")
+    for t in tes_scan_points:
+        syst_reel = systematics(data_set, tes=t)
+        data_rl, labels_rl, weights_rl = get_data(syst_reel)[3:] # toujours les 20% validation
+        
+        score_rl = model.predict(data_rl)
+        s_sc_rl, s_w_rl, b_sc_rl, b_w_rl = signal_bck(score_rl, labels_rl.to_numpy(), weights_rl.to_numpy())
+        
+        vrai_s, _ = np.histogram(s_sc_rl, bins=n_bins, range=(0, 1), weights=s_w_rl, density=False)
+        vrai_b, _ = np.histogram(b_sc_rl, bins=n_bins, range=(0, 1), weights=b_w_rl, density=False)
+        
+        true_signal_bin.append(vrai_s[bin_index])
+        true_bkg_bin.append(vrai_b[bin_index])
+
+    # 5. Création des graphiques (côte à côte : Signal et Background)
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # --- Graphique 1 : Signal ---
+    axs[0].plot(tes_fine_range, pred_signal_bin, color='blue', label='Prédiction du transformateur (Fit)', linewidth=2)
+    axs[0].scatter(tes_scan_points, true_signal_bin, color='black', marker='o', s=40, zorder=3, label='Vérité Terrain (Validation Set)')
+    axs[0].axvline(x=1.0, color='gray', linestyle='--', alpha=0.7, label='Cas Nominal (TES=1.0)')
+    axs[0].set_title(f"Signal - Évolution du Bin n°{bin_index}")
+    axs[0].set_xlabel("Valeur de la TES")
+    axs[0].set_ylabel("Contenu du bin (Densité)")
+    axs[0].grid(True, linestyle=':', alpha=0.6)
+    axs[0].legend()
+    
+    # --- Graphique 2 : Background ---
+    axs[1].plot(tes_fine_range, pred_bkg_bin, color='red', label='Prédiction du transformateur (Fit)', linewidth=2)
+    axs[1].scatter(tes_scan_points, true_bkg_bin, color='black', marker='o', s=40, zorder=3, label='Vérité Terrain (Validation Set)')
+    axs[1].axvline(x=1.0, color='gray', linestyle='--', alpha=0.7, label='Cas Nominal (TES=1.0)')
+    axs[1].set_title(f"Background - Évolution du Bin n°{bin_index}")
+    axs[1].set_xlabel("Valeur de la TES")
+    axs[1].set_ylabel("Contenu du bin (Densité)")
+    axs[1].grid(True, linestyle=':', alpha=0.6)
+    axs[1].legend()
+    
+    plt.tight_layout()
+    plt.show()
+
+
+
+############################################################################by beta
+
+def visualise_met(transformateur, data_set, model, bin_index: int, n_bins: int = 100):
+    """
+    Visualise l'évolution d'un bin spécifique en fonction de la valeur de MET.
+    Compare la vérité terrain (scan complet) et la prédiction du transformateur.
+    """
+    print(f"=== Génération de la visualisation pour le bin n°{bin_index} ===")
+    
+    # 1. Définir une plage de MET fine pour tracer une belle courbe prédictive continue
+    met_fine_range = np.linspace(-10, 10, 200)
+    
+    # 2. Récupérer l'histogramme nominal de validation (20%) comme base de calcul
+    val_data, labels_val, weights_val = get_data(data_set)[3:]
+    score_val = model.predict(val_data)
+    s_sc_v, s_w_v, b_sc_v, b_w_v = signal_bck(score_val, labels_val.to_numpy(), weights_val.to_numpy())
+    
+    s_hist_val, _ = np.histogram(s_sc_v, bins=n_bins, range=(0, 1), weights=s_w_v, density=False)
+    b_hist_val, _ = np.histogram(b_sc_v, bins=n_bins, range=(0, 1), weights=b_w_v, density=False)
+    
+    # 3. Calculer les prédictions du transformateur pour toute la plage de MET
+    pred_signal_bin = []
+    pred_bkg_bin = []
+    
+    for m in met_fine_range:
+        comp_s, comp_b = transformateur((s_hist_val, b_hist_val), m)
+        pred_signal_bin.append(comp_s[bin_index])
+        pred_bkg_bin.append(comp_b[bin_index])
+        
+    # 4. Échantillonner quelques "vrais" points réels pour la comparaison (ex: 15 points du détecteur)
+    met_scan_points = np.linspace(-10, 10, 15)
+    true_signal_bin = []
+    true_bkg_bin = []
+    
+    print("Échantillonnage des données réelles du détecteur...")
+    for m in met_scan_points:
+        syst_reel = systematics(data_set, met=m)
+        data_rl, labels_rl, weights_rl = get_data(syst_reel)[3:] # toujours les 20% validation
+        
+        score_rl = model.predict(data_rl)
+        s_sc_rl, s_w_rl, b_sc_rl, b_w_rl = signal_bck(score_rl, labels_rl.to_numpy(), weights_rl.to_numpy())
+        
+        vrai_s, _ = np.histogram(s_sc_rl, bins=n_bins, range=(0, 1), weights=s_w_rl, density=False)
+        vrai_b, _ = np.histogram(b_sc_rl, bins=n_bins, range=(0, 1), weights=b_w_rl, density=False)
+        
+        true_signal_bin.append(vrai_s[bin_index])
+        true_bkg_bin.append(vrai_b[bin_index])
+
+    # 5. Création des graphiques (côte à côte : Signal et Background)
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # --- Graphique 1 : Signal ---
+    axs[0].plot(met_fine_range, pred_signal_bin, color='blue', label='Prédiction du transformateur (Fit)', linewidth=2)
+    axs[0].scatter(met_scan_points, true_signal_bin, color='black', marker='o', s=40, zorder=3, label='Vérité Terrain (Validation Set)')
+    axs[0].axvline(x=1.0, color='gray', linestyle='--', alpha=0.7, label='Cas Nominal (MET=1.0)')
+    axs[0].set_title(f"Signal - Évolution du Bin n°{bin_index}")
+    axs[0].set_xlabel("Valeur de la MET")
+    axs[0].set_ylabel("Contenu du bin (Densité)")
+    axs[0].grid(True, linestyle=':', alpha=0.6)
+    axs[0].legend()
+    
+    # --- Graphique 2 : Background ---
+    axs[1].plot(met_fine_range, pred_bkg_bin, color='red', label='Prédiction du transformateur (Fit)', linewidth=2)
+    axs[1].scatter(met_scan_points, true_bkg_bin, color='black', marker='o', s=40, zorder=3, label='Vérité Terrain (Validation Set)')
+    axs[1].axvline(x=1.0, color='gray', linestyle='--', alpha=0.7, label='Cas Nominal (MET=1.0)')
+    axs[1].set_title(f"Background - Évolution du Bin n°{bin_index}")
+    axs[1].set_xlabel("Valeur de la MET")
+    axs[1].set_ylabel("Contenu du bin (Densité)")
+    axs[1].grid(True, linestyle=':', alpha=0.6)
+    axs[1].legend()
+    
+    plt.tight_layout()
+    plt.show()
+
+#################################################################################################
+
+
+
 
 # ==============================================================================
 # ZONE 1 : DASHBOARD SYSTÉMATIQUE (DISTRIBUTIONS + DIFFÉRENCES)
@@ -195,9 +351,26 @@ visualiser_impact_tes(mon_wrapper.model, eval_dict)
 
 # APPEL DES FITTERS (SUR LES 20% RESTANTS)
 print("Calcul de la paramétrisation TES (sur l'Eval Set)...")
-transformateur_tes = tes_fitter(
+
+# transformateur_tes = tes_fitter(
+    # model=mon_wrapper.model,
+    # train_set=mon_wrapper.training_set,
+    # n_bins=100
+# )
+
+transformateur_met = met_fitter(
     model=mon_wrapper.model,
-    train_set=eval_dict  
+    train_set=mon_wrapper.training_set,
+    n_bins=100
 )
+
+visualise_met(
+    transformateur=transformateur_met,
+    data_set=mon_wrapper.training_set,
+    model=mon_wrapper.model,
+    bin_index=26,
+    n_bins=100
+)
+
 print("Analyse terminée.")
 
