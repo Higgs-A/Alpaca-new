@@ -2,7 +2,9 @@ import numpy as np
 
 def compute_mu(score, weight, saved_info):
 
-    score = score.flatten() > saved_info["threshold"]
+    threshold = saved_info["threshold"]
+
+    score = score.flatten() > threshold
     score = score.astype(int)
 
     N_obs = np.sum(score * weight)
@@ -77,40 +79,34 @@ def calculate_saved_info(score, holdout_set):
     }
 
     print("saved_info", saved_info)
+    return saved_info
 
 import pandas as pd
+import numpy as np
 
-# 1. Charger le fichier CSV 
-# (Assure-toi de mettre le bon nom de fichier à la place de 'resultats_modele.csv')
-print("Lecture du fichier CSV...")
-df = pd.read_csv('BDT.csv')
 
-# 2. Extraire les colonnes sous forme de tableaux NumPy
-# On utilise .values pour les convertir au format mathématique attendu
+df = pd.read_csv('BDT.csv', sep=';')
+
 y_true = df['label'].values
 weights = df['weight'].values
 scores = df['score'].values
 
-# 3. Créer le fameux dictionnaire holdout_set (si tes fonctions l'utilisent encore)
 holdout_set = {
     "labels": y_true,
     "weights": weights
 }
 
-print("Données extraites avec succès !")
-print(f"Nombre d'événements : {len(scores)}")
+print("Données extraites")
 
-from Higgs_collaborations.sample_code_submission.boosted_decision_tree import XGBoost_BDT
 
-model=XGBoost_BDT()
+print("\n--- Lancement du calcul du seuil ---")
 
-# 2. Get saved_info (this triggers your predict method inside)
+# (On passe directement les scores extraits du CSV)
 saved_info = calculate_saved_info(scores, holdout_set)
 
-# 3. Trigger your predict method again to get the raw scores
-#raw_scores = model.predict(holdout_set["data"])
-
-# 4. Compute the final math
+print("\n--- Calcul des métriques finales ---")
 final_results = compute_mu(scores, holdout_set["weights"], saved_info)
 
-print(final_results)
+print("\n=== RÉSULTATS ===")
+for key, val in final_results.items():
+    print(f"{key}: {val:.4f}")
