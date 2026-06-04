@@ -6,18 +6,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-# ==========================================================
+
 # Choix du test — décommenter UNE seule ligne
-# ==========================================================
+
 
 # TEST = "alpha_beta"
 TEST = "subsample_colsample"
 # TEST = "depth"
 
 
-# ==========================================================
+
 # AMS
-# ==========================================================
 
 def amsasimov(s_in, b_in):
 
@@ -75,9 +74,8 @@ def significance_score(y_true, y_score, sample_weight):
     )
 
 
-# ==========================================================
+
 # Évaluation d'un modèle
-# ==========================================================
 
 def evaluate_model(X_train, y_train, w_train,
                    X_test, y_test, w_test, **params):
@@ -95,9 +93,8 @@ def evaluate_model(X_train, y_train, w_train,
     )
 
 
-# ==========================================================
+
 # Helper : heatmap 2D
-# ==========================================================
 
 def plot_heatmap(grid, x_values, y_values, xlabel, ylabel, title):
 
@@ -137,9 +134,7 @@ def plot_heatmap(grid, x_values, y_values, xlabel, ylabel, title):
     plt.show()
 
 
-# ==========================================================
 # Optimisation profondeur (1D)
-# ==========================================================
 
 def optimize_depth(X_train, y_train, w_train,
                    X_test, y_test, w_test):
@@ -178,9 +173,8 @@ def optimize_depth(X_train, y_train, w_train,
     print(f"\nBest → max_depth={best_depth}  AMS={best_score:.4f}")
 
 
-# ==========================================================
+
 # Optimisation croisée reg_alpha / reg_lambda
-# ==========================================================
 
 def optimize_alpha_beta(X_train, y_train, w_train,
                         X_test, y_test, w_test,
@@ -240,9 +234,8 @@ def optimize_alpha_beta(X_train, y_train, w_train,
           f"AMS={best_score:.4f}")
 
 
-# ==========================================================
+
 # Optimisation croisée subsample / colsample_bytree
-# ==========================================================
 
 def optimize_subsample_colsample(X_train, y_train, w_train,
                                  X_test, y_test, w_test,
@@ -302,9 +295,8 @@ def optimize_subsample_colsample(X_train, y_train, w_train,
           f"AMS={best_score:.4f}")
 
 
-# ==========================================================
+
 # Main
-# ==========================================================
 
 def hyperparameters_optimisation():
 

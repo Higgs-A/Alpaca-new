@@ -8,7 +8,6 @@ from get_data import get_clean_splits
 
 
 def amsasimov(s_in, b_in):
-    """Calcule la signification d'Asimov (arXiv:1007.1727)"""
     s = np.copy(s_in)
     b = np.copy(b_in)
     s = np.where((b_in == 0), 0.0, s_in)
@@ -17,11 +16,9 @@ def amsasimov(s_in, b_in):
     return np.where((s < 0) | (b < 0), np.nan, ams)
 
 def get_best_significance_and_threshold(y_true, y_score, sample_weight):
-    """
-    Calcule le vecteur de signification et retourne :
-    - Le Z-score maximum
-    - Le seuil (threshold) optimal associé
-    """
+    #Calcule le vecteur de signification et retourne :
+    #- Le Z-score maximum
+    # - Le seuil (threshold) optimal associé
     bins = np.linspace(0, 1.0, 101)
     s_hist, _ = np.histogram(y_score[y_true == 1], bins=bins, weights=sample_weight[y_true == 1])
     b_hist, _ = np.histogram(y_score[y_true == 0], bins=bins, weights=sample_weight[y_true == 0])
@@ -41,10 +38,8 @@ def get_best_significance_and_threshold(y_true, y_score, sample_weight):
 
 
 def grid_search_ams_and_threshold(X_train, y_train, weights_train):
-    """
-    Exécute une Grid Search pour optimiser l'AMS (Signification Z)
-    et cartographier le comportement du seuil optimal de coupure.
-    """
+    # Exécute une Grid Search pour optimiser l'AMS (Signification Z)
+    # et cartographier le comportement du seuil optimal de coupure.
     learning_rates = [0.005,0.01]
     stopping_rounds = [5,10,15]
     
@@ -82,7 +77,7 @@ def grid_search_ams_and_threshold(X_train, y_train, weights_train):
                 # Prédiction (Probabilités de Signal)
                 y_pred_val = test_model.predict(X_val_fold)
                 
-                # --- CALCUL AMS ET SEUIL ---
+                # Calcul AMS et seuil 
                 z_max, thresh_opt = get_best_significance_and_threshold(
                     y_true=y_val_fold.to_numpy(), 
                     y_score=y_pred_val, 
@@ -102,7 +97,7 @@ def grid_search_ams_and_threshold(X_train, y_train, weights_train):
     df_z = pd.DataFrame(z_matrix, index=learning_rates, columns=stopping_rounds)
     df_thresh = pd.DataFrame(threshold_matrix, index=learning_rates, columns=stopping_rounds)
     
-    # --- AFFICHAGE DE LA HEATMAP DES SCORES Z (AMS) ---
+    # Affichage de la heatmap des scores Z (AMS)
     plt.figure(figsize=(10, 5))
     sns.heatmap(df_z, annot=True, fmt=".2f", cmap="Purples", cbar_kws={'label': "Signification d'Asimov (Z)"})
     plt.title("Grid Search : Signification d'Asimov Maximale (Z)", fontsize=12, fontweight='bold', pad=15)
@@ -111,7 +106,7 @@ def grid_search_ams_and_threshold(X_train, y_train, weights_train):
     plt.tight_layout()
     plt.show()
 
-    # --- AFFICHAGE DE LA HEATMAP DES SEUILS OPTIMAUX ---
+    # Affichage de la heatmap des seuils optimaux
     plt.figure(figsize=(10, 5))
     sns.heatmap(df_thresh, annot=True, fmt=".2f", cmap="Oranges", cbar_kws={'label': "Seuil de Coupure Optimal (0 à 1)"})
     plt.title("Evolution du Seuil de Coupure Optimal selon les paramètres", fontsize=12, fontweight='bold', pad=15)

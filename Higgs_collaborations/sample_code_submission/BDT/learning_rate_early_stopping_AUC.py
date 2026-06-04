@@ -9,10 +9,8 @@ from boosted_decision_tree import XGBoost_BDT
 from get_data import get_clean_splits
 
 def grid_search_lr_and_stopping(X_train, y_train, weights_train):
-    """
-    Exécute une recherche sur grille complète croisant chaque Learning Rate
-    avec chaque valeur d'Early Stopping via une validation croisée à 3 plis.
-    """
+    # Exécute une recherche sur grille complète croisant chaque Learning Rate
+    # avec chaque valeur d'Early Stopping via une validation croisée à 3 plis.
     # Définition des listes de paramètres à croiser de manière exhaustive
     learning_rates = [0.01, 0.03, 0.05, 0.1, 0.2]
     stopping_rounds = [15, 30, 50, 80]
@@ -81,7 +79,7 @@ def grid_search_lr_and_stopping(X_train, y_train, weights_train):
     print(f" -> Validation ROC AUC Moyen : {best_auc:.4f}")
     print("="*45)
     
-    # --- AFFICHAGE DE LA HEATMAP ---
+    # Affichage de la heatmap
     plt.figure(figsize=(9, 6))
     sns.heatmap(df_scores, annot=True, fmt=".4f", cmap="YlGnBu", cbar_kws={'label': 'Validation ROC AUC'})
     plt.title("Grid Search : Interaction Learning Rate vs Early Stopping", fontsize=12, fontweight='bold', pad=15)
@@ -93,16 +91,15 @@ def grid_search_lr_and_stopping(X_train, y_train, weights_train):
 if __name__ == "__main__":
     np.random.seed(31415)
     
-    # 1. Chargement des données globales
+    # Chargement des données globales
     X_train, _, y_train, _, weights_train, _ = get_clean_splits()
     
-    # 2. Sous-échantillon pour garder un temps de calcul raisonnable (ex: 150k lignes)
-    # Même si c'est "plus long", 150k à 200k lignes suffisent amplement à donner la vérité statistique de la grille.
+    # Sous-échantillon pour garder un temps de calcul raisonnable (ex: 150k lignes)
     n_sample = 150000
     print(f"Sélection de {n_sample} événements pour la Grid Search...")
     X_tr_opti = X_train.iloc[:n_sample]
     y_tr_opti = y_train.iloc[:n_sample]
     w_tr_opti = weights_train.iloc[:n_sample]
 
-    # 3. Lancement de la grille exhaustive (5 LR * 4 Stopping = 20 combinaisons * 3 plis = 60 entraînements)
+    # Lancement de la grille exhaustive
     grid_search_lr_and_stopping(X_tr_opti, y_tr_opti, w_tr_opti)
