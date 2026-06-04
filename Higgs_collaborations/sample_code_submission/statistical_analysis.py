@@ -110,7 +110,7 @@ def calculate_saved_info(model, holdout_set):
 N_bins = 5
 
 def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
-    '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
+    '''Objective : splitting signal, background, and data into binned arrays for the '''
     # bin boundaries between 0 and 1
     bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
     # each array bin by bin
@@ -126,7 +126,16 @@ def NLL(mu, N, S, B):
     assert np.all(N >= 0) and np.all(S >= 0) and np.all(B >= 0), ("N, S and B must be positive integers")
     expected = mu * S + B
     nll_val = np.sum(expected - N * np.log(expected))
-    return nll_val
+    sigma_tes = 0.03
+    sigma_jes = 0.05
+
+    penalty = (
+    ((tes - 1)/sigma_tes)**2
+    +
+    ((jes - 1)/sigma_jes)**2
+    ) / 2
+
+    return nll_val + penalty
 
 def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
     '''
@@ -138,8 +147,10 @@ def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_s
     m.migrad()  # recherche du minimum
     m.hesse()   # calcul des erreurs
     #résultats
-    print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
-    print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
+    print(f"mu_hat = {m.values['mu']:.4f}")
+    print(f"sigma_mu = {m.errors['mu']:.4f}")
+    #print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
+    #print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
     print("NLL_min =", m.fval) # valeur minimale de NLL3
 
 
@@ -189,7 +200,8 @@ from scipy.interpolate import interp1d
 
 
 def plot_profile_likelihood_scan(
-    n_obs,
+
+    ...n_obs,
     S,
     B,
     mu_hat,
@@ -265,7 +277,7 @@ def plot_profile_likelihood_scan(
         mu_plus = mu_hat
 
     # Plot
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(6,4))
 
     plt.plot(
         mu_values,
@@ -424,7 +436,7 @@ def plot_binned_profile_likelihood(
         mu_plus = mu_hat
 
     # Plot
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(6,4))
 
     plt.plot(
         mu_values,
@@ -517,7 +529,7 @@ def plot_binned_profile_likelihood(
 
 def plot_binned_histograms(N_obs, S, B, mu_hat, N_bins=5, plot_show=True):
     '''Binned histograms for Task 1b'''
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(6,4))
     bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
     width = bin_edges[1] - bin_edges[0]
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
@@ -566,6 +578,12 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
     plt.figure(figsize=(9, 6))
    
     # courbe principale
+    plt.axhline(
+    0.5,
+    color="black",
+    linestyle="--",
+    label=r"$\Delta NLL = 0.5$"
+    )
     plt.plot(mu_vals, delta_nll, label=r"Unbinned $\Delta$NLL", color="#8B008B", lw=2.5)
     # 2. projection du minimum
     plt.axvline(mu_hat, color="red", linestyle="--", lw=1.5, alpha=0.8)
@@ -601,8 +619,8 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
 
 
 def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
+    plt.figure(figsize=(6,4))
     '''plot for unbinned distributions (Task 1b) (smoothed shape)'''
-    plt.figure(figsize=(8, 5))
     counts, bins, _ = plt.hist(Data_scores, bins=40, weights=Data_weights, alpha=0.3, label="Observed Data", color="gray", edgecolor="black")
     
     bin_width = bins[1] - bins[0]
@@ -715,6 +733,7 @@ def likelihood_fit_mu_tes_jes(
 #Plots pour les scans de profil de vraisemblance pour mu, tes et jes (2 paramètres sur 3) fixés à leur valeur de fit pour chaque scan)
 
 def plot_delta_nll_mu_tes_jes(
+    plt.figure(figsize=(6,4))
     x_values,
     delta_nll,
     x_hat,
@@ -858,6 +877,7 @@ def plot_delta_nll_mu_tes_jes(
 #profile likelihood scans pour mu, tes et jes
 
 def plot_profile_likelihood_scans(
+    plt.figure(figsize=(6,4))
     fit_result,
     n_obs,
     f,
@@ -983,7 +1003,7 @@ def plot_binned_histograms_mu_jes_tes(n_obs, f, g, fit_results, plot_show=True):
     B_post_fit = np.array([g[i](jes_hat) for i in range(n_bins)])
    
     model_post_fit = mu_hat * S_post_fit + B_post_fit
-    plt.figure(figsize=(9, 5.5))
+    plt.figure(figsize=(6,4))
    
     # données observées
     plt.errorbar(bin_centers, n_obs, yerr=np.sqrt(n_obs), fmt='ko',
