@@ -1,0 +1,89 @@
+def comparer_bdt_vs_nn_stat(
+    # éléments du BDT
+    S_scores_bdt, S_weights_bdt,
+    B_scores_bdt, B_weights_bdt,
+    N_scores_bdt, N_weights_bdt,
+    # éléments du NN
+    S_scores_nn, S_weights_nn,
+    B_scores_nn, B_weights_nn,
+    N_scores_nn, N_weights_nn,
+    # configuration du binning fixé
+    N_bins_choisi
+):
+   
+    # histogrammes via fonction 'prepare_binned'
+    Nb_bdt, Sb_bdt, Bb_bdt = prepare_binned(N_bins_choisi, S_scores_bdt, S_weights_bdt, B_scores_bdt, B_weights_bdt, N_scores_bdt, N_weights_bdt)
+   
+    Nb_nn, Sb_nn, Bb_nn = prepare_binned(N_bins_choisi, S_scores_nn, S_weights_nn, B_scores_nn, B_weights_nn, N_scores_nn, N_weights_nn)
+   
+    # structure pour la boucle de tracé
+    modeles = [{"name": "Modèle BDT", "Nb": Nb_bdt, "Sb": Sb_bdt, "Bb": Bb_bdt, "color": "#1f77b4"},
+        {"name": "Modèle NN", "Nb": Nb_nn, "Sb": Sb_nn, "Bb": Bb_nn, "color": "#d62728"}]
+   
+    # grille de scan de mu pour dessiner les paraboles
+    mu_scan = np.linspace(0.4, 1.6, 200)
+   
+    plt.figure(figsize=(11, 7))
+   
+    # Delta-NLL = 0.5
+    plt.axhline(0.5, color="#475569", linestyle="-.", alpha=0.6, label=r"$\Delta$NLL = 0.5 ($\pm 1\sigma\text{ stat}$)")
+   
+    for mod in modeles:
+        # valeurs de NLL brutes pour chaque point du scan
+        nll_brutes = np.array([NLL(mu, mod["Nb"], mod["Sb"], mod["Bb"]) for mu in mu_scan])
+       
+        # transformation en Delta-NLL (Soustraction du minimum)
+        dnll = nll_brutes - np.min(nll_brutes)
+       
+        # recherche du meilleur mu
+        idx_min = np.argmin(dnll)
+        mu_hat = mu_scan[idx_min]
+       
+        # division pour isoler les branches gauche et droite afin de réaliser l'interpolation
+        left_mask = mu_scan < mu_hat
+        right_mask = mu_scan > mu_hat
+       
+        try:
+            left_interp = interp1d(dnll[left_mask], mu_scan[left_mask], bounds_error=False, fill_value="extrapolate")
+            right_interp = interp1d(dnll[right_mask], mu_scan[right_mask], bounds_error=False, fill_value="extrapolate")
+           
+            # intersection précise avec le seuil Y = 0.5
+            mu_minus = float(left_interp(0.5))
+            mu_plus = float(right_interp(0.5))
+           
+            err_minus = mu_hat - mu_minus
+            err_plus = mu_plus - mu_hat
+           
+            # calcul écart (largeur parabole)
+            delta_mu = mu_plus - mu_minus
+           
+            legend_label = rf"{mod['name']} : $\mu = {mu_hat:.3f}_{{-{err_minus:.3f}}}^{{+{err_plus:.3f}}}$ | $\Delta\mu_{{1\sigma}} = {delta_mu:.3f}$"
+           
+            plt.scatter([mu_minus, mu_plus], [0.5, 0.5], color=mod["color"], s=50, zorder=5)
+           
+            # Projections pointillées verticales
+            plt.axvline(mu_minus, color=mod["color"], linestyle=":", alpha=0.4, lw=1.2)
+            plt.axvline(mu_plus, color=mod["color"], linestyle=":", alpha=0.4, lw=1.2)
+           
+        except Exception as e:
+            legend_label = f"{mod['name']} : $\hat{{\mu}} = {mu_hat:.3f}$ (Erreur d'interpolation)"
+           
+        # courbe principale
+        plt.plot(mu_scan, dnll, label=legend_label, color=mod["color"], lw=2.5)
+       
+        # point du Best-Fit au minimum (Y = 0)
+        plt.scatter([mu_hat], [0], color=mod["color"], s=60, edgecolors='black', zorder=6)
+       
+        # droite verticale centrale (point central de la parabole)
+        plt.axvline(mu_hat, color=mod["color"], linestyle="--", alpha=0.3)
+       
+    plt.xlabel(r"Force du Signal $\mu$", fontsize=12, labelpad=8)
+    plt.ylabel(r"$\Delta$NLL = NLL - $\text{NLL}_{min}$", fontsize=12, labelpad=8)
+    plt.title(f"Comparaison de la Précision Statistique ({N_bins_choisi} Bins) : BDT vs NN", fontsize=13, fontweight='bold', pad=18)
+   
+    plt.xlim(mu_scan.min(), mu_scan.max())
+    plt.ylim(-0.1, 3.0)
+    plt.grid(True, linestyle="--", alpha=0.45, zorder=0)
+    plt.legend(loc="upper center", fontsize=10, framealpha=0.95, facecolor='white', edgecolor='#cbd5e1')
+    plt.tight_layout()
+    plt.show()

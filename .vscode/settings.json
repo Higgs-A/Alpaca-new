@@ -1,0 +1,7 @@
+{
+    "python.testing.pytestArgs": [
+        "Higgs_collaborations"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}
