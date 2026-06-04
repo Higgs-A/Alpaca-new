@@ -202,15 +202,25 @@ class NeuralNetwork:
         plt.grid(True)
         plt.show()
 
-    def save_model(self, path):
+    def save_model(self, path = 'weighted_best_model'):
         """Save the trained model and scaler to the specified path."""
         os.makedirs(path, exist_ok=True)
         self.model.save(os.path.join(path, "model.keras"))
         joblib.dump(self.scaler, os.path.join(path, "scaler.pkl"))
         print(f"Model saved to {path}")
 
-    def load_model(self, path):
+    def load_model(self, path = 'weighted_best_model'):
         """Load the trained model and scaler from the specified path."""
         self.model  = load_model(os.path.join(path, "model.keras"))
         self.scaler = joblib.load(os.path.join(path, "scaler.pkl"))
         print(f"Model loaded from {path}")
+
+
+'''
+NN = NeuralNetwork()
+NN.load_modet()
+predict = NN.predict(test_data)
+
+
+
+'''
