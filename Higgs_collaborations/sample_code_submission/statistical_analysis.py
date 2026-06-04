@@ -191,7 +191,8 @@ from scipy.interpolate import interp1d
 
 
 def plot_profile_likelihood_scan(
-    n_obs,
+
+    ...n_obs,
     S,
     B,
     mu_hat,
@@ -267,7 +268,7 @@ def plot_profile_likelihood_scan(
         mu_plus = mu_hat
 
     # Plot
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(6,4))
 
     plt.plot(
         mu_values,
@@ -426,7 +427,7 @@ def plot_binned_profile_likelihood(
         mu_plus = mu_hat
 
     # Plot
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(6,4))
 
     plt.plot(
         mu_values,
@@ -519,7 +520,7 @@ def plot_binned_profile_likelihood(
 
 def plot_binned_histograms(N_obs, S, B, mu_hat, N_bins=5, plot_show=True):
     '''Binned histograms for Task 1b'''
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(6,4))
     bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
     width = bin_edges[1] - bin_edges[0]
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
@@ -609,8 +610,8 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
 
 
 def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
+    plt.figure(figsize=(6,4))
     '''plot for unbinned distributions (Task 1b) (smoothed shape)'''
-    plt.figure(figsize=(8, 5))
     counts, bins, _ = plt.hist(Data_scores, bins=40, weights=Data_weights, alpha=0.3, label="Observed Data", color="gray", edgecolor="black")
     
     bin_width = bins[1] - bins[0]
@@ -723,6 +724,7 @@ def likelihood_fit_mu_tes_jes(
 #Plots pour les scans de profil de vraisemblance pour mu, tes et jes (2 paramètres sur 3) fixés à leur valeur de fit pour chaque scan)
 
 def plot_delta_nll_mu_tes_jes(
+    plt.figure(figsize=(6,4))
     x_values,
     delta_nll,
     x_hat,
@@ -866,6 +868,7 @@ def plot_delta_nll_mu_tes_jes(
 #profile likelihood scans pour mu, tes et jes
 
 def plot_profile_likelihood_scans(
+    plt.figure(figsize=(6,4))
     fit_result,
     n_obs,
     f,
@@ -991,7 +994,7 @@ def plot_binned_histograms_mu_jes_tes(n_obs, f, g, fit_results, plot_show=True):
     B_post_fit = np.array([g[i](jes_hat) for i in range(n_bins)])
    
     model_post_fit = mu_hat * S_post_fit + B_post_fit
-    plt.figure(figsize=(9, 5.5))
+    plt.figure(figsize=(6,4))
    
     # données observées
     plt.errorbar(bin_centers, n_obs, yerr=np.sqrt(n_obs), fmt='ko',
