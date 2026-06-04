@@ -65,10 +65,26 @@ class NeuralNetwork:
         #model_dir = os.path.dirname(os.path.abspath(__file__))
         #from pathlib import Path
         #model_dir = Path("weighted_best_model")
+        '''
         model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "weighted_best_model")
         print(model_dir)
         self.model = load_model(os.path.join(model_dir, "model.keras"))
-        self.scaler = joblib.load(os.path.join(model_dir, "scaler.pkl"))
+        self.scaler = joblib.load(os.path.join(model_dir, "scaler.pkl"))'''
+        import torch
+        import joblib
+        
+        model_dir = "/content/drive/MyDrive/higgs_nn"
+
+        model_path = os.path.join(model_dir, "model.pt")
+        scaler_path = os.path.join(model_dir, "scaler.pkl")
+        self.scaler = joblib.load(scaler_path)
+        self.model = self.build_model()
+        self.model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        self.model.eval()
+
+        print("Model loaded from Drive")
+
+        return self
 
     def predict(self, test_data, labels=None, weights=None):
         self._predictions = self.model.predict(
