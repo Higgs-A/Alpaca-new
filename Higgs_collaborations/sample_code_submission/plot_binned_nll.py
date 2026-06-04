@@ -13,7 +13,7 @@ sys.path.append(str(project_root))
 from sample_code_submission.boosted_decision_tree import XGBoost_BDT
 from statistical_analysis import prepare_binned, NLL, plot_binned_profile_likelihood
 
-DEFAULT_DATA_DIR = Path.home() / "Downloads" / "blackSwan_data"
+DEFAULT_DATA_DIR = Path.home() / "Downloads" / "blackSwan_data" # à modifier selon l'emplacement de vos données
 
 def find_data_file(data_dir):
     data_dir = Path(data_dir)
