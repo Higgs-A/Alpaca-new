@@ -4,7 +4,7 @@ from HiggsML.systematics import systematics
 from iminuit import Minuit
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
-import systematic_analysis.py as sys
+#import Higgs_collaborations.sample_code_submission.systematic_analysis as sys
 
 """
 Task 1a : Counting Estimator
@@ -110,7 +110,7 @@ def calculate_saved_info(model, holdout_set):
 N_bins = 5
 
 def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
-    '''Objective : splitting signal, background, and data into binned arrays for the '''
+    '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
     # bin boundaries between 0 and 1
     bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
     # each array bin by bin
@@ -126,16 +126,7 @@ def NLL(mu, N, S, B):
     assert np.all(N >= 0) and np.all(S >= 0) and np.all(B >= 0), ("N, S and B must be positive integers")
     expected = mu * S + B
     nll_val = np.sum(expected - N * np.log(expected))
-    sigma_tes = 0.03
-    sigma_jes = 0.05
-
-    penalty = (
-    ((tes - 1)/sigma_tes)**2
-    +
-    ((jes - 1)/sigma_jes)**2
-    ) / 2
-
-    return nll_val + penalty
+    return nll_val
 
 def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
     '''
@@ -147,10 +138,8 @@ def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_s
     m.migrad()  # recherche du minimum
     m.hesse()   # calcul des erreurs
     #résultats
-    print(f"mu_hat = {m.values['mu']:.4f}")
-    print(f"sigma_mu = {m.errors['mu']:.4f}")
-    #print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
-    #print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
+    print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
+    print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
     print("NLL_min =", m.fval) # valeur minimale de NLL3
 
 
@@ -200,8 +189,7 @@ from scipy.interpolate import interp1d
 
 
 def plot_profile_likelihood_scan(
-
-    ...n_obs,
+    n_obs,
     S,
     B,
     mu_hat,
@@ -277,7 +265,7 @@ def plot_profile_likelihood_scan(
         mu_plus = mu_hat
 
     # Plot
-    plt.figure(figsize=(6,4))
+    plt.figure(figsize=(8, 5))
 
     plt.plot(
         mu_values,
@@ -436,7 +424,7 @@ def plot_binned_profile_likelihood(
         mu_plus = mu_hat
 
     # Plot
-    plt.figure(figsize=(6,4))
+    plt.figure(figsize=(8, 5))
 
     plt.plot(
         mu_values,
@@ -529,7 +517,7 @@ def plot_binned_profile_likelihood(
 
 def plot_binned_histograms(N_obs, S, B, mu_hat, N_bins=5, plot_show=True):
     '''Binned histograms for Task 1b'''
-    plt.figure(figsize=(6,4))
+    plt.figure(figsize=(8, 5))
     bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
     width = bin_edges[1] - bin_edges[0]
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
@@ -578,12 +566,6 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
     plt.figure(figsize=(9, 6))
    
     # courbe principale
-    plt.axhline(
-    0.5,
-    color="black",
-    linestyle="--",
-    label=r"$\Delta NLL = 0.5$"
-    )
     plt.plot(mu_vals, delta_nll, label=r"Unbinned $\Delta$NLL", color="#8B008B", lw=2.5)
     # 2. projection du minimum
     plt.axvline(mu_hat, color="red", linestyle="--", lw=1.5, alpha=0.8)
@@ -619,8 +601,8 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
 
 
 def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp, mu_hat, plot_show=True):
-    plt.figure(figsize=(6,4))
     '''plot for unbinned distributions (Task 1b) (smoothed shape)'''
+    plt.figure(figsize=(8, 5))
     counts, bins, _ = plt.hist(Data_scores, bins=40, weights=Data_weights, alpha=0.3, label="Observed Data", color="gray", edgecolor="black")
     
     bin_width = bins[1] - bins[0]
@@ -645,45 +627,79 @@ def plot_unbinned_distributions(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp
 
 
 
-
-#Task 2: on ne travaille qu'avec une méthode binned pour l'instant
-
-
-
-
-def NLL_mu_tes_jes(mu, tes, jes, n_obs, f, g):
-
-#on suppose que f et g sont les fonctions d'interpolations calculées par systematic_analysis.py pour gamma i et beta i respectivement 
-#f et g sont sous la forme d'un tableau de fonctions évaluées dans les bins, par exemple f[i](tes) donne la valeur de la fonction f pour le bin i et une valeur de tes. De même pour g[i](jes).
-#n-obs: tableau des nombres d'observations dans les bins, par exemple n_obs[i] donne le nombre d'observations dans le bin i.
+# Task 2: on ne travaille qu'avec une méthode binned pour l'instant
+ 
+# on suppose que f et g sont les fonctions d'interpolations calculées par systematic_analysis.py pour gamma i et beta i respectivement
+# f et g sont sous la forme d'un tableau de fonctions évaluées dans les bins, par exemple f[i](tes) donne la valeur de la fonction f pour le bin i et une valeur de tes. De même pour g[i](jes).
+# n-obs: tableau des nombres d'observations dans les bins, par exemple n_obs[i] donne le nombre d'observations dans le bin i.
 # tes_min et tes_max sont les limites de tes, jes_min et jes_max sont les limites de jes. Ces limites seront utilisées pour contraindre les paramètres tes et jes lors de l'optimisation avec Minuit.
+ 
+import numpy as np
+import matplotlib.pyplot as plt
+from iminuit import Minuit
+from scipy.interpolate import interp1d
+ 
+ 
+def NLL_3_systematics(
+    mu,
+    tes,
+    jes,
+    bkg_norm,
+    n_obs,
+    f,
+    g,
+):
+    """
+    Binned Poisson NLL.
+ 
+    f[i](tes, jes, bkg_norm)
+        -> prediction signal dans le bin i
+ 
+    g[i](tes, jes, bkg_norm)
+        -> prediction background dans le bin i
+    """
+ 
+    penalty_tes = 0.5 * ((tes - 1.0) / 0.03) ** 2
+ 
+    penalty_jes = 0.5 * ((jes - 1.0) / 0.03) ** 2
+ 
+    penalty_bkg = 0.5 * ((bkg_norm - 1.0) / 0.03) ** 2
+ 
     nll = 0.0
-
+ 
     for i in range(len(n_obs)):
-
-        # Signal prediction in bin i
-        gamma_i = f[i](tes)
-
-        # Background prediction in bin i
-        beta_i = g[i](jes)
-
-        # Expected number of events in bin i
-        lambda_i = mu * gamma_i + beta_i
-
-        # Prevent log(0)
-        lambda_i = max(lambda_i, 1e-10)
-
-        # Poisson likelihood contribution
-        nll -= (
-            n_obs[i] * np.log(lambda_i)
-            - lambda_i
+ 
+        gamma_i = f[i](
+            tes,
+            jes,
+            bkg_norm,
         )
-
-    return nll
-
-#minuit
-
-def likelihood_fit_mu_tes_jes(
+ 
+        beta_i = g[i](
+            tes,
+            jes,
+            bkg_norm,
+        )
+ 
+        lam = mu * gamma_i + beta_i
+ 
+        lam = max(lam, 1e-10)
+ 
+        nll -= (
+            n_obs[i] * np.log(lam)
+            - lam
+        )
+ 
+    return (
+        nll
+        + penalty_tes
+        + penalty_jes
+        + penalty_bkg
+    )
+ 
+ 
+def profile_nuisances(
+    mu_fixed,
     n_obs,
     f,
     g,
@@ -692,193 +708,58 @@ def likelihood_fit_mu_tes_jes(
     jes_min,
     jes_max,
 ):
-
-    #Minimize the NLL with respect to mu,tes et jes
-
-
+ 
+    def nll_profiled(
+        tes,
+        jes,
+        bkg_norm,
+    ):
+        return NLL_3_systematics(
+            mu_fixed,
+            tes,
+            jes,
+            bkg_norm,
+            n_obs,
+            f,
+            g,
+        )
+ 
     m = Minuit(
-        lambda mu, tes, jes:
-        NLL_mu_tes_jes(mu, tes, jes, n_obs, f, g),
-
-        mu=1.0,
+        nll_profiled,
         tes=1.0,
         jes=1.0,
+        bkg_norm=1.0,
     )
-
-    m.limits["mu"] = (0, None)
-    m.limits["tes"] = (tes_min, tes_max)
-    m.limits["jes"] = (jes_min, jes_max)
-
-    m.errordef = Minuit.LIKELIHOOD
-
-    # Find minimum
-    m.migrad()
-
-    # Compute uncertainties
-    m.hesse()
-
-    return {
-        "mu": m.values["mu"],
-        "mu_err": m.errors["mu"],
-
-        "tes": m.values["tes"],
-        "tes_err": m.errors["tes"],
-
-        "jes": m.values["jes"],
-        "jes_err": m.errors["jes"],
-
-        "nll_min": m.fval,
-    }
-
-#Plots pour les scans de profil de vraisemblance pour mu, tes et jes (2 paramètres sur 3) fixés à leur valeur de fit pour chaque scan)
-
-def plot_delta_nll_mu_tes_jes(
-    plt.figure(figsize=(6,4))
-    x_values,
-    delta_nll,
-    x_hat,
-    parameter_name,
-):
-
-    """
-    Plot ΔNLL for one parameter.
-
-    Also determines the ±1σ interval using
-
-        ΔNLL = 0.5
-
-    which corresponds to the 68% confidence interval
-    for one fitted parameter.
-    """
-
-    # Determine ±1σ interval
-
-    left_mask = x_values < x_hat
-    right_mask = x_values > x_hat
-
-    try:
-
-        left_interp = interp1d(
-            delta_nll[left_mask],
-            x_values[left_mask],
-            bounds_error=False,
-            fill_value="extrapolate",
-        )
-
-        right_interp = interp1d(
-            delta_nll[right_mask],
-            x_values[right_mask],
-            bounds_error=False,
-            fill_value="extrapolate",
-        )
-
-        x_minus = float(left_interp(0.5))
-        x_plus = float(right_interp(0.5))
-
-    except Exception:
-
-        x_minus = x_hat
-        x_plus = x_hat
-
-
-    plt.figure(figsize=(8, 5))
-
-    plt.plot(
-        x_values,
-        delta_nll,
-        linewidth=2,
-        label=rf"$\Delta$NLL({parameter_name})",
+ 
+    m.limits["tes"] = (
+        tes_min,
+        tes_max,
     )
-
-    # Best-fit value
-    plt.axvline(
-        x_hat,
-        color="red",
-        linestyle="--",
-        label=rf"{parameter_name}_hat = {x_hat:.4f}",
+ 
+    m.limits["jes"] = (
+        jes_min,
+        jes_max,
     )
-
-    # ΔNLL = 0.5 line
-    plt.axhline(
+ 
+    m.limits["bkg_norm"] = (
         0.5,
-        color="black",
-        linestyle=":",
-        label=r"$\Delta$NLL = 0.5",
+        1.5,
     )
-
-    # Confidence interval
-    plt.axvline(
-        x_minus,
-        color="green",
-        linestyle=":",
-    )
-
-    plt.axvline(
-        x_plus,
-        color="green",
-        linestyle=":",
-    )
-
-    # Markers
-    plt.scatter(
-        [x_hat],
-        [0],
-        color="red",
-        zorder=10,
-    )
-
-    plt.scatter(
-        [x_minus, x_plus],
-        [0.5, 0.5],
-        color="green",
-        zorder=10,
-    )
-
-    #annonations sur les courbes
-
-    plt.annotate(
-        rf"{x_hat:.4f}",
-        (x_hat, 0),
-        xytext=(10, 10),
-        textcoords="offset points",
-    )
-
-    plt.annotate(
-        rf"{x_minus:.4f}",
-        (x_minus, 0.5),
-        xytext=(-50, 10),
-        textcoords="offset points",
-    )
-
-    plt.annotate(
-        rf"{x_plus:.4f}",
-        (x_plus, 0.5),
-        xytext=(10, 10),
-        textcoords="offset points",
-    )
-
-    plt.xlabel(parameter_name)
-
-    plt.ylabel(r"$\Delta$NLL")
-
-    plt.title(
-        rf"Profile likelihood scan : {parameter_name}"
-    )
-
-    plt.grid(True)
-
-    plt.legend()
-
-    plt.tight_layout()
-
-    plt.show()
-
-
-#profile likelihood scans pour mu, tes et jes
-
-def plot_profile_likelihood_scans(
-    plt.figure(figsize=(6,4))
-    fit_result,
+ 
+    m.errordef = Minuit.LIKELIHOOD
+ 
+    m.migrad()
+    m.hesse()
+ 
+    return {
+        "tes_hat": m.values["tes"],
+        "jes_hat": m.values["jes"],
+        "bkg_hat": m.values["bkg_norm"],
+        "nll": m.fval,
+    }
+ 
+ 
+def profile_likelihood_scan_mu(
     n_obs,
     f,
     g,
@@ -887,144 +768,196 @@ def plot_profile_likelihood_scans(
     jes_min,
     jes_max,
 ):
-    """
-    Produce three profile likelihood scans:
-
-        ΔNLL(mu)
-        ΔNLL(TES)
-        ΔNLL(JES)
-
-    For each scan, the other two parameters
-    are fixed to their best-fit values.
-    """
-
-    # Best-fit values with minuit
-
-
-    mu_hat = fit_result["mu"]
-
-    tes_hat = fit_result["tes"]
-
-    jes_hat = fit_result["jes"]
-
-    nll_min = fit_result["nll_min"]
-
-    #mu libre
-
+ 
     mu_values = np.linspace(
-        max(0, mu_hat - 3),
-        mu_hat + 3,
-        1000,
+        0.5,
+        1.5,
+        101,
     )
-
-    delta_nll_mu = np.array([
-        NLL_mu_tes_jes(
+ 
+    profiled_nll = []
+ 
+    tes_best = []
+    jes_best = []
+    bkg_best = []
+ 
+    for mu in mu_values:
+ 
+        result = profile_nuisances(
             mu,
-            tes_hat,
-            jes_hat,
             n_obs,
             f,
             g,
-        ) - nll_min
-        for mu in mu_values
-    ])
-
-    plot_delta_nll_mu_tes_jes(
-        mu_values,
-        delta_nll_mu,
-        mu_hat,
-        r"\mu",
-    )
-
-    #tes libre
-
-    tes_values = np.linspace(
-        tes_min,
-        tes_max,
-        1000,
-    )
-
-    delta_nll_tes = np.array([
-        NLL_mu_tes_jes(
-            mu_hat,
-            tes,
-            jes_hat,
-            n_obs,
-            f,
-            g,
-        ) - nll_min
-        for tes in tes_values
-    ])
-
-    plot_delta_nll_mu_tes_jes(
-        tes_values,
-        delta_nll_tes,
-        tes_hat,
-        "TES",
-    )
-
-    #jes libre
-
-    jes_values = np.linspace(
-        jes_min,
-        jes_max,
-        1000,
-    )
-
-    delta_nll_jes = np.array([
-        NLL_mu_tes_jes(
-            mu_hat,
-            tes_hat,
-            jes,
-            n_obs,
-            f,
-            g,
-        ) - nll_min
-        for jes in jes_values
-    ])
-
-    plot_delta_nll_mu_tes_jes(
-        jes_values,
-        delta_nll_jes,
-        jes_hat,
-        "JES",
-    )
-
-
-def plot_binned_histograms_mu_jes_tes(n_obs, f, g, fit_results, plot_show=True):
-    mu_hat = fit_results["mu"]
-    tes_hat = fit_results["tes"]
-    jes_hat = fit_results["jes"]
-    n_bins = len(n_obs)
-    bin_centers = np.arange(n_bins) + 0.5  # Représentation par indice de bin
+            tes_min,
+            tes_max,
+            jes_min,
+            jes_max,
+        )
+ 
+        profiled_nll.append(
+            result["nll"]
+        )
+ 
+        tes_best.append(
+            result["tes_hat"]
+        )
+ 
+        jes_best.append(
+            result["jes_hat"]
+        )
+ 
+        bkg_best.append(
+            result["bkg_hat"]
+        )
+ 
+    return {
+        "mu": np.array(mu_values),
+        "nll": np.array(profiled_nll),
+        "tes_hat": np.array(tes_best),
+        "jes_hat": np.array(jes_best),
+        "bkg_hat": np.array(bkg_best),
+    }
+ 
+ 
+# Exécution de ton bloc de calcul
+scan = profile_likelihood_scan_mu(
+    n_obs,
+    f,
+    g,
+    tes_min,
+    tes_max,
+    jes_min,
+    jes_max,
+)
+ 
+idx = np.argmin(scan["nll"])
+ 
+mu_hat = scan["mu"][idx]
+nll_min = scan["nll"][idx]
+tes_hat = scan["tes_hat"][idx]
+jes_hat = scan["jes_hat"][idx]
+bkg_hat = scan["bkg_hat"][idx]
+ 
+print(f"mu_hat       = {mu_hat:.4f}")
+print(f"tes_hat      = {tes_hat:.4f}")
+print(f"jes_hat      = {jes_hat:.4f}")
+print(f"bkg_norm_hat = {bkg_hat:.4f}")
+print(f"NLL_min      = {nll_min:.4f}")
+ 
+ 
+def profile_nuisances_for_scenarios(mu_fixed, n_obs, f, g, tes_min, tes_max, jes_min, jes_max, fixed_list):
+    """
+    Fonction auxiliaire pour calculer la NLL d'un scénario bridé.
+    Gèle à 1.0 les paramètres contenus dans 'fixed_list'.
+    """
+    def nll_profiled(tes, jes, bkg_norm):
+        return NLL_3_systematics(mu_fixed, tes, jes, bkg_norm, n_obs, f, g)
+ 
+    m = Minuit(nll_profiled, tes=1.0, jes=1.0, bkg_norm=1.0)
+    m.limits["tes"] = (tes_min, tes_max)
+    m.limits["jes"] = (jes_min, jes_max)
+    m.limits["bkg_norm"] = (0.5, 1.5)
+    m.errordef = Minuit.LIKELIHOOD
+ 
+    # Bloquer les paramètres ciblés pour ce scénario
+    for param in fixed_list:
+        m.fixed[param] = True
+        m.values[param] = 1.0  # Réinitialisation stricte à la valeur nominale
+ 
+    m.migrad()
+    return m.fval
+ 
+ 
+def plot_profile_likelihood_scans_superposition(n_obs, f, g, tes_min, tes_max, jes_min, jes_max, scan):
+    mu_values = scan["mu"]
    
-    #spectres de signal et fond au point de best fit
-    S_post_fit = np.array([f[i](tes_hat) for i in range(n_bins)])
-    B_post_fit = np.array([g[i](jes_hat) for i in range(n_bins)])
+    # 4 scénarios d'analyse cumulatifs
+    scenarios = [
+        {"name": "1. Stat-Only", "fixed": ["tes", "jes", "bkg_norm"], "color": "#1f77b4", "nll": []},
+        {"name": "2. Stat + JES", "fixed": ["tes", "bkg_norm"], "color": "#ff7f0e", "nll": []},
+        {"name": "3. Stat + JES + TES", "fixed": ["bkg_norm"], "color": "#2ca02c", "nll": []},
+        {"name": "4. Full Fit", "fixed": [], "color": "#d62728", "nll": list(scan["nll"])}
+    ]
+ 
+    # Calcul des NLL pour les scénarios 1, 2 et 3
+    for sc in scenarios:
+        if len(sc["nll"]) == 0:  # Si la liste est vide, on calcule
+            for mu in mu_values:
+                nll_val = profile_nuisances_for_scenarios(
+                    mu, n_obs, f, g, tes_min, tes_max, jes_min, jes_max, sc["fixed"]
+                )
+                sc["nll"].append(nll_val)
+       
+        sc["nll"] = np.array(sc["nll"])
+        sc["dnll"] = sc["nll"] - np.min(sc["nll"])
+ 
+    plt.figure(figsize=(12, 7.5))
    
-    model_post_fit = mu_hat * S_post_fit + B_post_fit
-    plt.figure(figsize=(6,4))
+    # Delta-NLL = 0.5 pour l'incertitude 1-sigma
+    plt.axhline(0.5, color="#475569", linestyle="-.", alpha=0.6, label=r"$\Delta$NLL = 0.5 ($\pm 1\sigma$)")
+ 
+    # Analyse mathématique fine et traçage de chaque parabole
+    for sc in scenarios:
+        dnll = sc["dnll"]
+        color = sc["color"]
+       
+        # Extraction du minimum de la courbe courante
+        idx_min = np.argmin(dnll)
+        sc_mu_hat = mu_values[idx_min]
+       
+        # Séparation de la courbe à gauche et à droite pour l'interpolation 1-sigma
+        left_mask = mu_values < sc_mu_hat
+        right_mask = mu_values > sc_mu_hat
+       
+        error_str = ""
+        delta_mu_str = ""
+       
+        try:
+            # Interpolation spline linéaire pour trouver le croisement exact avec Delta-NLL = 0.5
+            left_interp = interp1d(dnll[left_mask], mu_values[left_mask], bounds_error=False, fill_value="extrapolate")
+            right_interp = interp1d(dnll[right_mask], mu_values[right_mask], bounds_error=False, fill_value="extrapolate")
+           
+            mu_minus = float(left_interp(0.5))
+            mu_plus = float(right_interp(0.5))
+           
+            # Calcul des erreurs asymétriques et du Delta total de l'abscisse (largeur à 1-sigma)
+            err_minus = sc_mu_hat - mu_minus
+            err_plus = mu_plus - sc_mu_hat
+            delta_mu = mu_plus - mu_minus
+           
+            error_str = rf"$\mu = {sc_mu_hat:.3f}_{{-{err_minus:.3f}}}^{{+{err_plus:.3f}}}$"
+            delta_mu_str = rf" | $\Delta\mu_{{1\sigma}} = {delta_mu:.3f}$"
+           
+            # Points marqueurs colorés aux intersections horizontales à Y = 0.5
+            plt.scatter([mu_minus, mu_plus], [0.5, 0.5], color=color, s=40, zorder=5)
+            # Lignes pointillées verticales projetées vers l'axe X
+            plt.axvline(mu_minus, color=color, linestyle=":", alpha=0.35, lw=1.2)
+            plt.axvline(mu_plus, color=color, linestyle=":", alpha=0.35, lw=1.2)
+           
+        except Exception:
+            error_str = rf"$\hat{{\mu}} = {sc_mu_hat:.3f}$"
+            delta_mu_str = " (Erreur d'interpolation)"
+ 
+        # Tracé de la ligne principale de la parabole
+        full_label = f"{sc['name']} : {error_str}{delta_mu_str}"
+        plt.plot(mu_values, dnll, label=full_label, color=color, lw=2.5)
+       
+        # Marqueur physique du point de best-fit au minimum (Y = 0)
+        plt.scatter([sc_mu_hat], [0], color=color, s=50, edgecolors='black', zorder=6)
+ 
+    # Configuration des métadonnées du graphique
+    plt.xlabel(r"Paramètre d'intérêt (Force du Signal $\mu$)", fontsize=12, labelpad=8)
+    plt.ylabel(r"$\Delta$NLL = NLL - $\text{NLL}_{min}$", fontsize=12, labelpad=8)
+    plt.title("Profils de Vraisemblance Cumulatifs : Dégradation de la Précision de $\mu$ par les Systématiques",
+              fontsize=13, fontweight='bold', pad=18)
    
-    # données observées
-    plt.errorbar(bin_centers, n_obs, yerr=np.sqrt(n_obs), fmt='ko',
-                 label="Données observées ($N_{obs}$)", zorder=3)
+    plt.xlim(mu_values.min(), mu_values.max())
+    plt.ylim(-0.15, 3.5)
    
-    # histogramme du fond ajusté
-    plt.bar(bin_centers, B_post_fit, width=1.0, alpha=0.4, color="orange",
-            edgecolor="darkorange", label=f"Fond Post-fit (JES = {jes_hat:.3f})", zorder=1)
+    plt.grid(True, linestyle="--", alpha=0.45, zorder=0)
+    plt.legend(loc="upper center", fontsize=9.5, framealpha=0.95, facecolor='white', edgecolor='#cbd5e1')
    
-    # 3. Modèle total ajusté
-    plt.step(np.arange(n_bins + 1), np.append(model_post_fit, model_post_fit[-1]), where="post",
-             color="green", linewidth=2.5,
-             label=f"Signal + Fond ($\\hat{{\\mu}}$ = {mu_hat:.2f}, TES = {tes_hat:.3f})", zorder=2)
-   
-    plt.xlabel("Index du Bin")
-    plt.ylabel("Nombre d'Événements (Pondérés)")
-    plt.title("Histogramme Binné Post-Fit : Effet des Incertitudes Systématiques")
-    plt.xticks(bin_centers, [f"Bin {i+1}" for i in range(n_bins)])
-    plt.grid(True, linestyle="--", alpha=0.5)
-    plt.legend(loc="upper right")
     plt.tight_layout()
-   
-    if plot_show:
-        plt.show()
+    plt.show()
+ 
+ 
