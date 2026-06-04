@@ -15,7 +15,7 @@ from HiggsML.systematics import systematics
 
 #Geoffroy--------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# from HiggsML.datasets import download_dataset, Data
+from HiggsML.datasets import download_dataset, Data
 # Ensure the package containing HiggsML is on sys.path so we can import HiggsML.datasets
 # black_swan_pkg_path = r'c:\Users\geoff\Documents\Centrale\cours_centrale\ST4\EI\black_swan_pkg'
 # if black_swan_pkg_path not in sys.path:
@@ -25,23 +25,23 @@ from HiggsML.systematics import systematics
 #Youri--------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
-from datasets import download_dataset
+# from datasets import download_dataset
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Download dataset later (we change working dir first); keep this line commented to avoid duplicate downloads
 # data = download_dataset("blackSwan_data")
 
-# Changer vers le dossier du script pour télécharger les données localement
-os.chdir(os.path.dirname(__file__))
+# # Changer vers le dossier du script pour télécharger les données localement
+# os.chdir(os.path.dirname(__file__))
 
-data = download_dataset(
-    "blackSwan_data"
-)
-data.load_train_set()
-data_set = data.get_train_set()
-target = data_set["labels"]
-data_cleaned = data_set.replace(-25, np.nan)
+# data = download_dataset(
+#     "blackSwan_data"
+# )
+# data.load_train_set()
+# data_set = data.get_train_set()
+# target = data_set["labels"]
+# data_cleaned = data_set.replace(-25, np.nan)
 
 def data_jet_one(data): 
     # We keep all the rows where the value of "PRI_n_jets" is 1 but we keep all the columns, it's just take out some data
@@ -100,15 +100,7 @@ def feature_corrilations(data, show=False):
     if show:
         plt.show()
     return corr_matrix
-    
-# feature_corrilations(data_jet_one(data_set))
-# feature_corrilations(data_jet_zero(data_set))
-# feature_corrilations(data_jet_two(data_set))
-   
-# print(data_set.columns)
-# print(data_set["detailed_labels"])
-# print(data_set["weights"])
-# print(data_set["labels"])
+
 
 def feature_signal_background_correlations(data, show=False):
     sns.set_theme(style="whitegrid")
@@ -147,7 +139,7 @@ def feature_signal_background_correlations(data, show=False):
     #print(dfplot)
     return dfplot
 
-feature_signal_background_correlations(data_set, show=True)
+
 
 
 features_all = [
@@ -360,10 +352,7 @@ def minimal_dependent_features(data):
 #     feature_corrilations(data_set)
 
 
-# Les matrices sont calculées sans affichage graphique ici.
-# Si vous voulez les visualiser, appelez les fonctions avec show=True ou décommentez les lignes ci-dessous.
-matrix_line = feature_signal_background_correlations(data_set, show=False)
-matrix_square = feature_corrilations(data_set, show=False)
+
 
 def value_signal(data_set, lst):
     
@@ -436,9 +425,21 @@ def conversion_numbers_into_names(score, indices, data_frame):
     return score, selected_features
 
 
-# systematic_dependence(Data("c:/Users/noahl/Documents/EI_PP"),True)
+systematic_dependence(Data("c:/Users/noahl/Documents/EI_PP"),True)
 # data = Data("c:/Users/noahl/Documents/EI_PP")
 # data.load_train_set()
 # dfmod = data.get_train_set()
 # df_lowbias = dfmod.drop(columns=["PRI_had_pt", "PRI_jet_subleading_pt", "DER_mass_vis", "DER_pt_ratio_lep_had"])
 # df_lowcorr = dfmod.drop(columns=["PRI_lep_phi","PRI_had_phi","PRI_jet_subleading_phi","PRI_met_phi"])
+# Les matrices sont calculées sans affichage graphique ici.
+# Si vous voulez les visualiser, appelez les fonctions avec show=True ou décommentez les lignes ci-dessous.
+# matrix_line = feature_signal_background_correlations(data_set, show=False)
+# matrix_square = feature_corrilations(data_set, show=False)
+# feature_signal_background_correlations(data_set, show=True)
+# feature_corrilations(data_jet_one(data_set))
+# feature_corrilations(data_jet_zero(data_set))
+# feature_corrilations(data_jet_two(data_set))
+# print(data_set.columns)
+# print(data_set["detailed_labels"])
+# print(data_set["weights"])
+# print(data_set["labels"])
