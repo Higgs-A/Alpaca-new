@@ -133,8 +133,8 @@ def tes_fitter(model:model.Model, train_set:dict,  n_bins:int = 50):
         diff_computed_s = np.array([poly(tes) for poly in fit_functions_s])
         diff_computed_b = np.array([poly(tes) for poly in fit_functions_b])
         # Applique la transformation à un tableau nominal pour un TES donné
-        transformed_array_s = my_array_s  + diff_computed_s 
-        transformed_array_b = my_array_b  + diff_computed_b
+        transformed_array_s = diff_computed_s 
+        transformed_array_b = diff_computed_b
         return np.array(transformed_array_s), np.array(transformed_array_b) # je caste une deuxième fois parce qu'on st jamais trop sûr
 
 
@@ -164,8 +164,11 @@ def tes_fitter(model:model.Model, train_set:dict,  n_bins:int = 50):
  
         s_hist_val, _ = np.histogram(s_sc_val, bins=n_bins, range=(0, 1), weights=s_w_val, density=False)
         b_hist_val, _ = np.histogram(b_sc_val, bins=n_bins, range=(0, 1), weights=b_w_val, density=False)
-        computed_s_hist, computed_b_hist = transformateur((s_hist_val, b_hist_val), tes_value)
+        delta_s, delta_b = transformateur((s_hist_val, b_hist_val), tes_value)
 
+
+        computed_s_hist = s_hist_val + delta_s
+        computed_b_hist = b_hist_val + delta_b
         print("-----calcul de l'erreur quadratique moyenne-----")
         # calcul du MSE sur différentes valeurs
         mse_s, mse_b = [], []
@@ -266,7 +269,7 @@ def jes_fitter(model, train_set, n_bins:int = 100):
         s_histogram,_ = np.histogram(
         s_score, bins=n_bins, range=(0, 1), weights=s_weight, density=True
         )
-        b_histogram,_ = np.histogram(
+        b_histogram,_ = np.histogram( 
             b_score, bins=n_bins, range=(0, 1), weights=b_weight, density=True
         )
         # On stocke la diff par rapport au cas nominal, bien voir que ici on stocke déjà la différence entre les histogrammes
@@ -292,8 +295,8 @@ def jes_fitter(model, train_set, n_bins:int = 100):
         diff_computed_s = np.array([poly(jes) for poly in fit_functions_s])
         diff_computed_b = np.array([poly(jes) for poly in fit_functions_b])
         # Applique la transformation à un tableau nominal pour un JES donné
-        transformed_array_s = my_array_s  + diff_computed_s 
-        transformed_array_b = my_array_b  + diff_computed_b
+        transformed_array_s =  diff_computed_s 
+        transformed_array_b =  diff_computed_b
         return np.array(transformed_array_s), np.array(transformed_array_b) # je caste une deuxième fois parce qu'on st jamais trop sûr
     
     def test_jes_fitter(transformateur, data_set, jes_value):
@@ -322,8 +325,10 @@ def jes_fitter(model, train_set, n_bins:int = 100):
  
         s_hist_val, _ = np.histogram(s_sc_val, bins=n_bins, range=(0, 1), weights=s_w_val, density=True)
         b_hist_val, _ = np.histogram(b_sc_val, bins=n_bins, range=(0, 1), weights=b_w_val, density=True)
-        computed_s_hist, computed_b_hist = transformateur((s_hist_val, b_hist_val), jes_value)
+        delta_s, delta_b = transformateur((s_hist_val, b_hist_val), jes_value)
 
+        computed_s_hist = s_hist_val + delta_s
+        computed_b_hist = b_hist_val + delta_b
         print("-----calcul de l'erreur quadratique moyenne-----")
         # calcul du MSE sur différentes valeurs
         mse_s, mse_b = [], []
@@ -422,8 +427,8 @@ def met_fitter(model, train_set, n_bins:int = 100):
         diff_computed_s = np.array([poly(met) for poly in fit_functions_s])
         diff_computed_b = np.array([poly(met) for poly in fit_functions_b])
         # Applique la transformation à un tableau nominal pour un MET donné
-        transformed_array_s = my_array_s  + diff_computed_s 
-        transformed_array_b = my_array_b  + diff_computed_b
+        transformed_array_s = diff_computed_s 
+        transformed_array_b = diff_computed_b
         return np.array(transformed_array_s), np.array(transformed_array_b) # je caste une deuxième fois parce qu'on st jamais trop sûr
     
     def unique_test_met_fitter(transformateur, data_set, met_value):
