@@ -138,8 +138,10 @@ def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_s
     m.migrad()  # recherche du minimum
     m.hesse()   # calcul des erreurs
     #résultats
-    print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
-    print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
+    print(f"mu_hat = {m.values['mu']:.4f}")
+    print(f"sigma_mu = {m.errors['mu']:.4f}")
+    #print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
+    #print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
     print("NLL_min =", m.fval) # valeur minimale de NLL3
 
 
@@ -566,6 +568,12 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
     plt.figure(figsize=(9, 6))
    
     # courbe principale
+    plt.axhline(
+    0.5,
+    color="black",
+    linestyle="--",
+    label=r"$\Delta NLL = 0.5$"
+    )
     plt.plot(mu_vals, delta_nll, label=r"Unbinned $\Delta$NLL", color="#8B008B", lw=2.5)
     # 2. projection du minimum
     plt.axvline(mu_hat, color="red", linestyle="--", lw=1.5, alpha=0.8)
