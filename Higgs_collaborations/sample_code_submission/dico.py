@@ -122,7 +122,7 @@ def generer_saved_info(model, training_dict, num_bins=num_bins):
 # ZONE 1 : DASHBOARD VISUEL (POUR VOS VERIFICATIONS VISUELLES)
 # ==============================================================================
 
-def visualiser_impact_systematique(model, training_dict, syst_name="tes", param_min=0.7, param_max=1.3, step=0.01,num_bins=num_bins):
+def visualiser_impact_systematique(model, training_dict, syst_name="tes", param_min=0.7, param_max=1.3, step=0.005,num_bins=num_bins):
     syst_name_upper = syst_name.upper()
     val_nominale = NOMINALS.get(syst_name, 1.0)
    
@@ -274,7 +274,7 @@ def N_total_bin(bin_i, tes, jes, bnorm, smet, saved_info, classe="S"):
     
     Formule : N_i = N_nominale_i + sum(Delta_i)
     """
-    # 1. La base nominale (le point de départ à 1.0 partout)
+    # 1. La base nominale (le point de départ à 1.0 partout, sauf met à 0.0)
     n_nominale = saved_info[classe]["nominal"][bin_i]
     
     # 2. Calcul de chaque dérive individuelle via votre fonction universelle
@@ -288,7 +288,7 @@ def N_total_bin(bin_i, tes, jes, bnorm, smet, saved_info, classe="S"):
     n_total = n_nominale + delta_tes + delta_jes + delta_bnorm + delta_smet
     
     # Sécurité physique : un nombre d'événements ne peut pas être négatif
-    return max(0, n_total)
+    return n_total
 
 # Exemple de ce que fera le groupe STAT :
 def calcul_prediction_totale(parametres, saved_info,num_bins=num_bins):
