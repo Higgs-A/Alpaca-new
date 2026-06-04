@@ -21,14 +21,15 @@ from sklearn.preprocessing import StandardScaler
 
 class NeuralNetwork:
 
-    def __init__(self, n_features=None):
+    def __init__(self, n_features=None, train_data = None):
         self.model  = None
         self.scaler = StandardScaler()
 
         self._predictions  = None
         self._test_labels  = None
         self._test_weights = None
-
+        if n_features is None and train_data is not None :
+            n_features = train_data.shape[1]
         if n_features is not None:
             self._initialize_model(n_features)
 
@@ -61,33 +62,9 @@ class NeuralNetwork:
 
     def fit(self, train_data, y_train, weights_train=None):
         """Train the model."""
-        if self.model is None:
-            raise ValueError(
-                "Model is not initialized. Ensure `_initialize_model` is called or load a saved model."
-            )
-
-        X_train = self.scaler.fit_transform(train_data)
-
-        callbacks = [
-            EarlyStopping(
-                monitor="val_auc", mode="max",
-                patience=10, restore_best_weights=True, verbose=1,
-            ),
-            ReduceLROnPlateau(
-                monitor="val_auc", mode="max",
-                factor=0.5, patience=5, min_lr=1e-6, verbose=1,
-            ),
-        ]
-
-        self.history = self.model.fit(
-            X_train, y_train,
-            sample_weight=weights_train,
-            epochs=100,
-            batch_size=512,
-            validation_split=0.2,
-            callbacks=callbacks,
-            verbose=2,
-        )
+        model_dir = os.path.dirname(os.path.abspath(__file__))
+        self.model = load_model(os.path.join(model_dir, "model.keras"))
+        self.scaler = joblib.load(os.path.join(model_dir, "scaler.pkl"))
 
     def predict(self, test_data, labels=None, weights=None):
         self._predictions = self.model.predict(
