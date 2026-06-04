@@ -56,3 +56,15 @@ Exécution du pipeline complet sur 500 pseudo-expériences.
 | Quantile Score   | -13.15       | -13.14    |
 | AMS (max)        | n/a          | **4.36**  |
 
+
+## Mercredi 03/06
+  - Travail de collaboration avec les différentes équipes afin d'établir le squelette du pipeline final
+  - Discussions avec l'équipe SYST afin de comprendre ce dont ils avaient besoin pour mener leurs études. 
+  - Brainstorming avec mon équipe afin de comparer les résultats de nos différents NN et d'en choisir un pour le fournir aux autres équipes. Le choix s'est basé sur l'AMS et l'AUC.
+  
+## Jeudi 04/06 
+- Travail sur le squelette de la présentation Beamer (slides en LaTeX) pour la restitution finale
+- Mise au clair de l'enchaînement complet du pipeline du projet : découpage des données (training, validation, holdout, test), rôle de chaque ensemble, fonctionnement de model.py, déroulement des 500 pseudo-expériences
+- Décorticage cellule par cellule du notebook (histogrammes des features, courbe ROC, scatter plot µ_prédit vs µ_vrai, etc.) pour comprendre les sorties
+- Tentative d'implémentation d'une cellule de HPO (grid search sur le nombre de couches, le nombre de neurones, le dropout et le learning rate) : la cellule est écrite et le neural_network.py rendu paramétrable, mais l'exécution a échoué côté environnement (le nouveau venv n'était pas reconnu comme kernel par VS Code malgré l'installation d'ipykernel et son enregistrement manuel)
+- Retour à la version propre du repo via git restore 
