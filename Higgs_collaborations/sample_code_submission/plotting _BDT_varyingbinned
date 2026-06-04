@@ -14,7 +14,7 @@ sys.path.append(str(project_root))
 from boosted_decision_tree import XGBoost_BDT
 from statistical_analysis import prepare_binned, NLL # plot_binned_profile_likelihood is no longer needed here
 
-DEFAULT_DATA_DIR = Path.home() / "Downloads" / "blackSwan_data"
+DEFAULT_DATA_DIR = Path.home() /"Documents"/"CS1A"/ "S6"/"EI_BS" / "Higgs_collaborations"/"blackSwan_data"
 
 def find_data_file(data_dir):
     data_dir = Path(data_dir)
