@@ -4,13 +4,8 @@ from boosted_decision_tree import BoostedDecisionTree
 from sklearn.model_selection import train_test_split
 import numpy as np
 
-
-# ==================================================
-# AMS (Approximate Median Significance)
-# ==================================================
 def ams(s, b, b_reg=10.0):
     """
-    AMS standard utilisé en Higgs ML competitions.
 
     s = somme des poids signal
     b = somme des poids background
@@ -24,9 +19,6 @@ def ams(s, b, b_reg=10.0):
     )
 
 
-# ==================================================
-# Significance score basé sur un seuil
-# ==================================================
 def significance_score(y_true, y_score, sample_weight, threshold=0.5):
 
     y_pred = (y_score > threshold)
@@ -36,10 +28,6 @@ def significance_score(y_true, y_score, sample_weight, threshold=0.5):
 
     return ams(s, b)
 
-
-# ==================================================
-# MAIN OPTIMIZATION
-# ==================================================
 def optimize_hyperparameters():
 
     print("\nChargement des données...")
@@ -69,10 +57,7 @@ def optimize_hyperparameters():
 
     print(f"Train : {len(X_train):,} événements")
     print(f"Test  : {len(X_test):,} événements")
-
-    # ==================================================
-    # OPTIMISATION MAX_DEPTH
-    # ==================================================
+    
     depths = [5, 6, 7, 8, 9, 10]
 
     best_depth = None
@@ -103,9 +88,6 @@ def optimize_hyperparameters():
             best_score = score
             best_depth = depth
 
-    # ==================================================
-    # OPTIMISATION SUBSAMPLE / COLSAMPLE
-    # ==================================================
     subsamples = [0.7, 0.8, 0.9]
     colsamples = [0.7, 0.8, 0.9]
 
@@ -145,9 +127,7 @@ def optimize_hyperparameters():
                 best_subsample = subsample
                 best_colsample = colsample
 
-    # ==================================================
-    # RESULTATS FINAUX
-    # ==================================================
+
     print("\n" + "=" * 60)
     print("BEST CONFIGURATION")
     print("=" * 60)
