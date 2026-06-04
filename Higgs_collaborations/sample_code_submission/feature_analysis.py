@@ -392,18 +392,21 @@ def engineering_angles(data):
         df[f'{col}_cos'] = np.cos(df[col])
     return df
 
-def to_cartesian(data, particle_prefix):
+def to_cartesian(data):
+    particule_prefixes = ['PRI_lep', 'PRI_had', 'PRI_jet_leading', 'PRI_jet_subleading']
     df = data.copy()
+    for particle_prefix in particule_prefixes:
+        pt = df[f'{particle_prefix}_pt']
+        phi = df[f'{particle_prefix}_phi']
+        eta = df[f'{particle_prefix}_eta']
     
-    pt = df[f'{particle_prefix}_pt']
-    phi = df[f'{particle_prefix}_phi']
-    eta = df[f'{particle_prefix}_eta']
-    
-    df[f'{particle_prefix}_px'] = pt * np.cos(phi)
-    df[f'{particle_prefix}_py'] = pt * np.sin(phi)
-    df[f'{particle_prefix}_pz'] = pt * np.sinh(eta)
+        df[f'{particle_prefix}_px'] = pt * np.cos(phi)
+        df[f'{particle_prefix}_py'] = pt * np.sin(phi)
+        df[f'{particle_prefix}_pz'] = pt * np.sinh(eta)
     
     return df
+
+
 
 def conversion_numbers_into_names(score, indices):
     feature_cols = [col for col in data_cleaned.columns if col.startswith('PRI_') or col.startswith('DER_')]
