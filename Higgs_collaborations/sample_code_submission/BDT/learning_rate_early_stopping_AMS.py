@@ -74,7 +74,7 @@ def grid_search_ams_and_threshold(X_train, y_train, weights_train):
                 test_model.model.set_params(learning_rate=lr, early_stopping_rounds=stopping)
                 test_model.fit(X_tr_fold, y_tr_fold, weights=w_tr_fold)
                 
-                # Prédiction (Probabilités de Signal)
+                # Prédiction 
                 y_pred_val = test_model.predict(X_val_fold)
                 
                 # Calcul AMS et seuil 

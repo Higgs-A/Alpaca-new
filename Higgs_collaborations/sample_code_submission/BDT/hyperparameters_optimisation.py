@@ -1,5 +1,5 @@
 from get_data import get_clean_splits
-from boosted_decision_tree import BoostedDecisionTree
+from boosted_decision_tree import XGBoost_BDT as BoostedDecisionTree
 
 from sklearn.model_selection import train_test_split
 import numpy as np
@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 # Choix du test — décommenter UNE seule ligne
 
 
-# TEST = "alpha_beta"
-TEST = "subsample_colsample"
+TEST = "alpha_beta"
+# TEST = "subsample_colsample"
 # TEST = "depth"
 
 
