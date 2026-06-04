@@ -70,6 +70,8 @@ def generer_saved_info(model, training_dict, num_bins=num_bins):
         "S": {},
         "B": {}
     }
+    saved_info["S"]["nominal"] = nom_s_counts.tolist()
+    saved_info["B"]["nominal"] = nom_b_counts.tolist()
 
     # Helper interne pour obtenir les deltas d'une configuration spécifique
     def obtenir_deltas(syst_key, direction):
@@ -250,9 +252,9 @@ def Delta_gamma_universel(bin_i, sys_val, syst_name, saved_info, classe="S",SIGM
     if syst_name in ["tes", "jes"]:
         sys_max, sys_min, sys_nom = SIGMA_SHIFTS[syst_name]["plus"], SIGMA_SHIFTS[syst_name]["minus"], NOMINALS[syst_name]
     elif syst_name == "bnorm":
-        sys_max, sys_min, sys_nom = SIGMA_SHIFTS[syst_name]["plus"], SIGMA_SHIFTS[syst_name]["minus"], NOMINALS[syst_name]
+        sys_max, sys_min, sys_nom = SIGMA_SHIFTS[syst_name]["plus"], SIGMA_SHIFTS[syst_name]["minus"], NOMINALS["bkg_scale"]
     elif syst_name == "smet":
-        sys_max, sys_min, sys_nom = SIGMA_SHIFTS[syst_name]["plus"], SIGMA_SHIFTS[syst_name]["minus"], NOMINALS[syst_name]
+        sys_max, sys_min, sys_nom = SIGMA_SHIFTS[syst_name]["plus"], SIGMA_SHIFTS[syst_name]["minus"], NOMINALS["soft_met"]
 
     # Lecture du dictionnaire
     delta_plus = saved_info[classe][syst_name][bin_i][0]
@@ -263,6 +265,39 @@ def Delta_gamma_universel(bin_i, sys_val, syst_name, saved_info, classe="S",SIGM
     cste = -pente * sys_nom
     
     return pente * sys_val + cste
+
+
+def N_total_bin(bin_i, tes, jes, bnorm, smet, saved_info, classe="S"):
+    """
+    Calcule le nombre total d'événements (S ou B) dans un bin donné
+    en additionnant la base nominale et toutes les dérives systématiques.
+    
+    Formule : N_i = N_nominale_i + sum(Delta_i)
+    """
+    # 1. La base nominale (le point de départ à 1.0 partout)
+    n_nominale = saved_info[classe]["nominal"][bin_i]
+    
+    # 2. Calcul de chaque dérive individuelle via votre fonction universelle
+    # On additionne les deltas au nominal
+    delta_tes = Delta_gamma_universel(bin_i, tes, "tes", saved_info, classe)
+    delta_jes = Delta_gamma_universel(bin_i, jes, "jes", saved_info, classe)
+    delta_bnorm = Delta_gamma_universel(bin_i, bnorm, "bnorm", saved_info, classe)
+    delta_smet = Delta_gamma_universel(bin_i, smet, "smet", saved_info, classe)
+    
+    # 3. Somme totale
+    n_total = n_nominale + delta_tes + delta_jes + delta_bnorm + delta_smet
+    
+    # Sécurité physique : un nombre d'événements ne peut pas être négatif
+    return max(0, n_total)
+
+# Exemple de ce que fera le groupe STAT :
+def calcul_prediction_totale(parametres, saved_info,num_bins=num_bins):
+    # parametres = [tes, jes, bnorm, smet]
+    pred_S = [N_total_bin(i, *parametres, saved_info, classe="S") for i in range(num_bins)]
+    pred_B = [N_total_bin(i, *parametres, saved_info, classe="B") for i in range(num_bins)]
+    return pred_S, pred_B
+
+
 
 def verifier_interpolation(model, training_dict, saved_info, syst_name="tes"):
     """
@@ -343,4 +378,47 @@ def verifier_interpolation(model, training_dict, saved_info, syst_name="tes"):
     plt.show()
 
     # Vérification de la validité de votre modèle de droites
-verifier_interpolation(mon_wrapper.model, eval_dict, info_pour_stat, syst_name="tes")
+#verifier_interpolation(mon_wrapper.model, eval_dict, info_pour_stat, syst_name="tes")
+
+# ==============================================================================
+# TEST DE VALIDATION DE LA FONCTION N_TOTAL
+# ==============================================================================
+
+print("\n--- TEST DE LA FONCTION N_TOTAL ---")
+
+# 1. On choisit un bin à tester (par exemple le bin 0)
+test_bin = 0
+
+# 2. TEST AU NOMINAL : Toutes les systématiques à leur valeur de référence
+# Le résultat doit être EXACTEMENT égal à la valeur nominale du dictionnaire.
+val_nominale_S = info_pour_stat["S"]["nominal"][test_bin]
+
+calcul_nominale = N_total_bin(
+    bin_i=test_bin, 
+    tes=1.0, jes=1.0, bnorm=1.0, smet=0.0, # Valeurs nominales
+    saved_info=info_pour_stat, 
+    classe="S"
+)
+
+print(f"Bin {test_bin} | Valeur dictionnaire : {val_nominale_S:.2f}")
+print(f"Bin {test_bin} | Calcul N_total (nom) : {calcul_nominale:.2f}")
+
+if np.isclose(val_nominale_S, calcul_nominale):
+    print("TEST NOMINAL RÉUSSI : La fonction retrouve bien la base !")
+else:
+    print("TEST NOMINAL ÉCHOUÉ : Il y a un décalage.")
+
+# 3. TEST AVEC SHIFT : On augmente le TES de 3% (1.03)
+# Le résultat doit être différent de la valeur nominale.
+calcul_shift = N_total_bin(
+    bin_i=test_bin, 
+    tes=1.03, jes=1.02, bnorm=1.04, smet=0.0, # On décale le TES
+    saved_info=info_pour_stat, 
+    classe="S"
+)
+
+print(f"Bin {test_bin} | Calcul N_total (+3% TES) : {calcul_shift:.2f}")
+print(f"Différence induite : {calcul_shift - val_nominale_S:.2f}")
+
+if calcul_shift != val_nominale_S:
+    print("TEST SHIFT RÉUSSI : La systématique est bien prise en compte !")
