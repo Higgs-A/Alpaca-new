@@ -335,8 +335,8 @@ def Score_systematics (data,features=features_all ) :
     
     # Add labels and title
     plt.xlabel("Features")
-    plt.ylabel("Score")
-    plt.title("Total Impact of bias Score")
+    plt.ylabel("Chi-2")
+    plt.title("Total Impact of bias Chi-2 for each feature")
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
     plt.show()
