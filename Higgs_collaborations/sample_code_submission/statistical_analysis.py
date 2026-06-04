@@ -110,7 +110,7 @@ def calculate_saved_info(model, holdout_set):
 N_bins = 5
 
 def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
-    '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
+    '''Objective : splitting signal, background, and data into binned arrays for the '''
     # bin boundaries between 0 and 1
     bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
     # each array bin by bin
@@ -126,7 +126,16 @@ def NLL(mu, N, S, B):
     assert np.all(N >= 0) and np.all(S >= 0) and np.all(B >= 0), ("N, S and B must be positive integers")
     expected = mu * S + B
     nll_val = np.sum(expected - N * np.log(expected))
-    return nll_val
+    sigma_tes = 0.03
+    sigma_jes = 0.05
+
+    penalty = (
+    ((tes - 1)/sigma_tes)**2
+    +
+    ((jes - 1)/sigma_jes)**2
+    ) / 2
+
+    return nll_val + penalty
 
 def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
     '''
