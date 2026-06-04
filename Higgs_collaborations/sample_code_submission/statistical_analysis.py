@@ -3,6 +3,7 @@ import numpy as np
 from HiggsML.systematics import systematics
 from iminuit import Minuit
 from scipy.stats import gaussian_kde
+from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import systematic_analysis.py as sys
 
@@ -146,8 +147,23 @@ def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_s
 
 def prepare_unbinned(S_scores, S_weights, B_scores, B_weights):
     #création des PDFs continues grâce aux scores et poids des simulations
-    pdf_S = gaussian_kde(S_scores, weights=S_weights)
-    pdf_B = gaussian_kde(B_scores, weights=B_weights)
+    eps = 1e-6
+    rng = np.random.default_rng(42)
+
+    S_scores = np.asarray(S_scores, dtype=float)
+    B_scores = np.asarray(B_scores, dtype=float)
+    S_weights = np.asarray(S_weights, dtype=float)
+    B_weights = np.asarray(B_weights, dtype=float)
+
+    S_scores = np.clip(S_scores, eps, 1.0 - eps)
+    B_scores = np.clip(B_scores, eps, 1.0 - eps)
+
+    # Jitter to avoid singular covariance in KDE when scores are overly concentrated.
+    S_scores = S_scores + rng.normal(0.0, 1e-6, size=S_scores.shape)
+    B_scores = B_scores + rng.normal(0.0, 1e-6, size=B_scores.shape)
+
+    pdf_S = gaussian_kde(S_scores, weights=S_weights, bw_method="scott")
+    pdf_B = gaussian_kde(B_scores, weights=B_weights, bw_method="scott")
     #pour un nb total attendu mu=1
     N_S_expected = np.sum(S_weights)
     N_B_expected = np.sum(B_weights)
@@ -164,14 +180,17 @@ def unbinned_NLL(mu, N_scores, N_weights, pdf_S, pdf_B, N_S_exp, N_B_exp):
     f_B = pdf_B(N_scores)
     # Combinaison : vraisemblance pour chaque événement individuel
     event_likelihood = (mu * N_S_exp * f_S + N_B_exp * f_B) / N_expected_total
+    event_likelihood = np.clip(event_likelihood, 1e-12, None)
     nll_val = N_expected_total - np.sum(N_weights * np.log(event_likelihood))
+    if not np.isfinite(nll_val):
+        return 1e10
     return nll_val
 
 def compute_mu_unbinned(mu0, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
     pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights)
     # minuit 
     nll_func = lambda mu: unbinned_NLL(mu, N_scores, N_weights, pdf_S, pdf_B, N_S, N_B)
-    m = Minuit(nll_func, mu=1.0)
+    m = Minuit(nll_func, mu=mu0)
     m.limits["mu"] = (0, None)
     m.errordef = Minuit.LIKELIHOOD
     m.migrad() 
@@ -180,6 +199,7 @@ def compute_mu_unbinned(mu0, S_scores, S_weights, B_scores, B_weights, N_scores,
     print("mu_hat =", m.values["mu"])
     print("sigma_mu =", m.errors["mu"])
     print("NLL_min =", m.fval)
+    return m.values["mu"], m.errors["mu"], m.fval
 
 # PLOTS 
 
@@ -233,6 +253,7 @@ def plot_binned_profile_likelihood(
     B,
     mu_hat,
     NLL,
+    save_path=None,
     plot_show=True,
 ):
     """
@@ -270,16 +291,24 @@ def plot_binned_profile_likelihood(
     right_mask = mu_values > mu_hat
 
     try:
+        left_delta = delta_nll[left_mask]
+        left_mu = mu_values[left_mask]
+        left_order = np.argsort(left_delta)
+
+        right_delta = delta_nll[right_mask]
+        right_mu = mu_values[right_mask]
+        right_order = np.argsort(right_delta)
+
         left_interp = interp1d(
-            delta_nll[left_mask],
-            mu_values[left_mask],
+            left_delta[left_order],
+            left_mu[left_order],
             bounds_error=False,
             fill_value="extrapolate",
         )
 
         right_interp = interp1d(
-            delta_nll[right_mask],
-            mu_values[right_mask],
+            right_delta[right_order],
+            right_mu[right_order],
             bounds_error=False,
             fill_value="extrapolate",
         )
@@ -380,6 +409,9 @@ def plot_binned_profile_likelihood(
     plt.grid(True)
     plt.tight_layout()
 
+    if save_path is not None:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+
     if plot_show:
         plt.show()
 
@@ -413,6 +445,14 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
  
     mu_vals_full = np.linspace(0, 5, 1000)
     nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
+    if not np.all(np.isfinite(nll_vals_full)):
+        finite_max = np.nanmax(nll_vals_full[np.isfinite(nll_vals_full)]) if np.any(np.isfinite(nll_vals_full)) else 1e12
+        nll_vals_full = np.nan_to_num(
+            nll_vals_full,
+            nan=finite_max + 1e6,
+            posinf=finite_max + 1e6,
+            neginf=finite_max + 1e6,
+        )
     nll_min = np.min(nll_vals_full)
     delta_nll_full = nll_vals_full - nll_min
  
@@ -425,10 +465,42 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
  
     try:
         from scipy.interpolate import interp1d
-        left_interp = interp1d(delta_nll[left_mask], mu_vals[left_mask], bounds_error=False, fill_value="extrapolate")
-        right_interp = interp1d(delta_nll[right_mask], mu_vals[right_mask], bounds_error=False, fill_value="extrapolate")
-        mu_lower = float(left_interp(0.5))
-        mu_upper = float(right_interp(0.5))
+
+        mu_lower = mu_hat
+        mu_upper = mu_hat
+
+        if np.sum(left_mask) > 2:
+            left_delta = delta_nll[left_mask]
+            left_mu = mu_vals[left_mask]
+            left_order = np.argsort(left_delta)
+            left_delta_sorted = left_delta[left_order]
+            left_mu_sorted = left_mu[left_order]
+            left_delta_unique, left_unique_idx = np.unique(left_delta_sorted, return_index=True)
+            if left_delta_unique.size > 1:
+                left_interp = interp1d(
+                    left_delta_unique,
+                    left_mu_sorted[left_unique_idx],
+                    bounds_error=False,
+                    fill_value="extrapolate",
+                )
+                mu_lower = float(left_interp(0.5))
+
+        if np.sum(right_mask) > 2:
+            right_delta = delta_nll[right_mask]
+            right_mu = mu_vals[right_mask]
+            right_order = np.argsort(right_delta)
+            right_delta_sorted = right_delta[right_order]
+            right_mu_sorted = right_mu[right_order]
+            right_delta_unique, right_unique_idx = np.unique(right_delta_sorted, return_index=True)
+            if right_delta_unique.size > 1:
+                right_interp = interp1d(
+                    right_delta_unique,
+                    right_mu_sorted[right_unique_idx],
+                    bounds_error=False,
+                    fill_value="extrapolate",
+                )
+                mu_upper = float(right_interp(0.5))
+
         delta_mu = mu_upper - mu_lower
     except Exception as e:
         mu_lower, mu_upper, delta_mu = mu_hat, mu_hat, 0.0
