@@ -62,7 +62,7 @@ def significance_score(y_true, y_score, sample_weight=None):
     return np.max(z_ams)
 
 def plot_score_distribution(y_true, y_score, weights=None):
-    #Affiche la distribution des scores de classification pour le Signal et le Bruit de fond.
+    # Affiche la distribution des scores de classification pour le Signal et le Bruit de fond.
     if weights is None:
         weights = np.ones(len(y_true))
 

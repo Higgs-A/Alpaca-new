@@ -6,13 +6,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-# ==========================================================
+
 # Choix du test — décommenter UNE seule ligne
-# ==========================================================
+
 
 TEST = "alpha_beta"
 # TEST = "subsample_colsample"
 # TEST = "depth"
+
+
 
 # AMS
 
@@ -71,6 +73,8 @@ def significance_score(y_true, y_score, sample_weight):
         significance_vscore(y_true, y_score, sample_weight)
     )
 
+
+
 # Évaluation d'un modèle
 
 def evaluate_model(X_train, y_train, w_train,
@@ -89,7 +93,8 @@ def evaluate_model(X_train, y_train, w_train,
     )
 
 
-#  heatmap 2D
+
+# Helper : heatmap 2D
 
 def plot_heatmap(grid, x_values, y_values, xlabel, ylabel, title):
 
@@ -168,6 +173,7 @@ def optimize_depth(X_train, y_train, w_train,
     print(f"\nBest → max_depth={best_depth}  AMS={best_score:.4f}")
 
 
+
 # Optimisation croisée reg_alpha / reg_lambda
 
 def optimize_alpha_beta(X_train, y_train, w_train,
@@ -228,6 +234,7 @@ def optimize_alpha_beta(X_train, y_train, w_train,
           f"AMS={best_score:.4f}")
 
 
+
 # Optimisation croisée subsample / colsample_bytree
 
 def optimize_subsample_colsample(X_train, y_train, w_train,
@@ -286,6 +293,7 @@ def optimize_subsample_colsample(X_train, y_train, w_train,
     print(f"\nBest → subsample={best_params['subsample']}  "
           f"colsample_bytree={best_params['colsample_bytree']}  "
           f"AMS={best_score:.4f}")
+
 
 
 # Main
