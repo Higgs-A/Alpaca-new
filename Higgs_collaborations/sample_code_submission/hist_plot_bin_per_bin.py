@@ -123,7 +123,7 @@ def visualise_met(transformateur, data_set, model, bin_index: int, n_bins: int =
     
     print("Échantillonnage des données réelles du détecteur...")
     for m in met_scan_points:
-        syst_reel = systematics(data_set, met=m)
+        syst_reel = systematics(data_set, soft_met=m)
         data_rl, labels_rl, weights_rl = get_data(syst_reel)[3:] # toujours les 20% validation
         
         score_rl = model.predict(data_rl)
@@ -347,20 +347,28 @@ mon_wrapper.fit()
 
 # LANCEMENT DE LA VISUALISATION (SUR LES 20% RESTANTS)
 print("Génération des graphiques multi-shifts (sur l'Eval Set)...")
-visualiser_impact_tes(mon_wrapper.model, eval_dict)
+# visualiser_impact_tes(mon_wrapper.model, eval_dict)
 
 # APPEL DES FITTERS (SUR LES 20% RESTANTS)
 print("Calcul de la paramétrisation TES (sur l'Eval Set)...")
 
-# transformateur_tes = tes_fitter(
-    # model=mon_wrapper.model,
-    # train_set=mon_wrapper.training_set,
-    # n_bins=100
-# )
+transformateur_tes = tes_fitter(
+    model=mon_wrapper.model,
+    train_set=mon_wrapper.training_set,
+    n_bins=100
+)
 
 transformateur_met = met_fitter(
     model=mon_wrapper.model,
     train_set=mon_wrapper.training_set,
+    n_bins=100
+)
+
+visualise_tes(
+    transformateur=transformateur_tes,
+    data_set=mon_wrapper.training_set,
+    model=mon_wrapper.model,
+    bin_index=26,
     n_bins=100
 )
 

@@ -151,8 +151,8 @@ def tes_fitter(model:model.Model, train_set:dict,  n_bins:int = 50):
  
         s_sc_rl, s_w_rl, b_sc_rl, b_w_rl = signal_bck(score_reel, labels_reel_arr, weights_reel_arr)
  
-        vrai_s_hist, _ = np.histogram(s_sc_rl, bins=n_bins, range=(0, 1), weights=s_w_rl, density=True)
-        vrai_b_hist, _ = np.histogram(b_sc_rl, bins=n_bins, range=(0, 1), weights=b_w_rl, density=True)
+        vrai_s_hist, _ = np.histogram(s_sc_rl, bins=n_bins, range=(0, 1), weights=s_w_rl, density=False)
+        vrai_b_hist, _ = np.histogram(b_sc_rl, bins=n_bins, range=(0, 1), weights=b_w_rl, density=False)
 
         print("-----evaluation avec la fonction générée------")
         # on extrait les signal et background nominaux
@@ -162,8 +162,8 @@ def tes_fitter(model:model.Model, train_set:dict,  n_bins:int = 50):
         weights_val_arr = weights_val.to_numpy()
         s_sc_val, s_w_val, b_sc_val, b_w_val = signal_bck(score_val, labels_val_arr, weights_val_arr)
  
-        s_hist_val, _ = np.histogram(s_sc_val, bins=n_bins, range=(0, 1), weights=s_w_val, density=True)
-        b_hist_val, _ = np.histogram(b_sc_val, bins=n_bins, range=(0, 1), weights=b_w_val, density=True)
+        s_hist_val, _ = np.histogram(s_sc_val, bins=n_bins, range=(0, 1), weights=s_w_val, density=False)
+        b_hist_val, _ = np.histogram(b_sc_val, bins=n_bins, range=(0, 1), weights=b_w_val, density=False)
         computed_s_hist, computed_b_hist = transformateur((s_hist_val, b_hist_val), tes_value)
 
         print("-----calcul de l'erreur quadratique moyenne-----")
@@ -191,7 +191,7 @@ def tes_fitter(model:model.Model, train_set:dict,  n_bins:int = 50):
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
         plt.show()
     
-    test_tes_fitter(fit_function, data_set)
+    # test_tes_fitter(fit_function, data_set)
 
 
 
@@ -332,8 +332,8 @@ def jes_fitter(model, train_set, n_bins:int = 100):
         print(f"Erreur quadratique moyenne (Signal) : {mse_s:.4f}")
         print(f"Erreur quadratique moyenne (Bkg)    : {mse_b:.4f}") 
 
-    for jes in [0.98, 1.015, 1.13]:
-        test_jes_fitter(fit_function, data_set, jes)
+    # for jes in [0.98, 1.015, 1.13]:
+        # test_jes_fitter(fit_function, data_set, jes)
 
 
 
@@ -439,8 +439,8 @@ def met_fitter(model, train_set, n_bins:int = 100):
  
         s_sc_rl, s_w_rl, b_sc_rl, b_w_rl = signal_bck(score_reel, labels_reel_arr, weights_reel_arr)
  
-        vrai_s_hist, _ = np.histogram(s_sc_rl, bins=n_bins, range=(0, 1), weights=s_w_rl, density=True)
-        vrai_b_hist, _ = np.histogram(b_sc_rl, bins=n_bins, range=(0, 1), weights=b_w_rl, density=True)
+        vrai_s_hist, _ = np.histogram(s_sc_rl, bins=n_bins, range=(0, 1), weights=s_w_rl, density=False)
+        vrai_b_hist, _ = np.histogram(b_sc_rl, bins=n_bins, range=(0, 1), weights=b_w_rl, density=False)
 
         print("-----evaluation avec la fonction générée------")
         # on extrait les signal et background nominaux
@@ -450,8 +450,8 @@ def met_fitter(model, train_set, n_bins:int = 100):
         weights_val_arr = weights_val.to_numpy()
         s_sc_val, s_w_val, b_sc_val, b_w_val = signal_bck(score_val, labels_val_arr, weights_val_arr)
  
-        s_hist_val, _ = np.histogram(s_sc_val, bins=n_bins, range=(0, 1), weights=s_w_val, density=True)
-        b_hist_val, _ = np.histogram(b_sc_val, bins=n_bins, range=(0, 1), weights=b_w_val, density=True)
+        s_hist_val, _ = np.histogram(s_sc_val, bins=n_bins, range=(0, 1), weights=s_w_val, density=False)
+        b_hist_val, _ = np.histogram(b_sc_val, bins=n_bins, range=(0, 1), weights=b_w_val, density=False)
         computed_s_hist, computed_b_hist = transformateur((s_hist_val, b_hist_val), met_value)
 
         print("-----calcul de l'erreur quadratique moyenne-----")
@@ -479,10 +479,58 @@ def met_fitter(model, train_set, n_bins:int = 100):
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
         plt.show()
     
-    test_met_fitter(fit_function, data_set)
-
+    # test_met_fitter(fit_function, data_set)
 
     return fit_function
+
+
+
+
+
+def global_fit_function(model, train_set, n_bins=100):
+    transf_1 = tes_fitter(model, train_set, n_bins)
+    transf_2 = jes_fitter(model, train_set, n_bins)
+    transf_3 = met_fitter(model, train_set, n_bins)
+
+    data_set = train_set
+    NOMINAL_PARAMS = {
+        "tes":1.0,
+        "jes":1.0,
+        "bkg_scale":1.0,
+        "soft_met":0.0
+    }
+ 
+    #  Obtenir l'histogramme des scores nominaux 
+    syst_set = systematics(data_set, **NOMINAL_PARAMS)
+    alt_data = get_data(syst_set)[0]
+ 
+    # le score nominal
+ 
+    score = model.predict(alt_data) 
+ 
+    labels_data = get_data(syst_set)[1]
+    labels_array = labels_data.to_numpy()
+    weights_data = get_data(syst_set)[2]
+    weights_array = weights_data.to_numpy()
+ 
+    s_score, s_weight, b_score, b_weight = signal_bck(score, labels_array, weights_array)
+ 
+    s_histogram,_ = np.histogram(
+        s_score, bins=n_bins, range=(0, 1), weights=s_weight, density=False
+    )
+    b_histogram,_ = np.histogram(
+        b_score, bins=n_bins, range=(0, 1), weights=b_weight, density=False
+    )
+ 
+    s_ref_data = s_histogram
+    b_ref_data = b_histogram
+
+    def fit_function(array, theta):
+        return s_ref_data + transf_1(array, theta[0])[0] + transf_2(array, theta[1])[0] + transf_3(array, theta[2])[0] ,b_ref_data + transf_1(array, theta[0])[1] + transf_2(array, theta[1])[1] + transf_3(array, theta[2])[1]
+
+    return fit_function
+
+
 
 ################################################################ by beta
 
