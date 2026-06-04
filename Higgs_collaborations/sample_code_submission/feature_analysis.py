@@ -11,11 +11,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
+from HiggsML.systematics import systematics
 
 #Geoffroy--------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # from HiggsML.datasets import download_dataset, Data
-# from HiggsML.systematics import systematics
 # Ensure the package containing HiggsML is on sys.path so we can import HiggsML.datasets
 # black_swan_pkg_path = r'c:\Users\geoff\Documents\Centrale\cours_centrale\ST4\EI\black_swan_pkg'
 # if black_swan_pkg_path not in sys.path:
