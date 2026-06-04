@@ -1,0 +1,30 @@
+mu_list = []
+sigma_list = []
+bin_list = []
+
+for nbins in range(1, 26):
+
+    mu, sigma = likelihood_fit_mu_binned(
+        N_obs,
+        gamma_hist,
+        beta_hist,
+        nbins
+    )
+
+    mu_list.append(mu)
+    sigma_list.append(sigma)
+    bin_list.append(nbins)
+
+plt.figure(figsize=(6,4))
+plt.plot(bin_list, mu_list, marker="o")
+plt.xlabel("Number of bins")
+plt.ylabel("mu_hat")
+plt.grid()
+plt.show()
+
+plt.figure(figsize=(6,4))
+plt.plot(bin_list, sigma_list, marker="o")
+plt.xlabel("Number of bins")
+plt.ylabel("sigma(mu)")
+plt.grid()
+plt.show()
