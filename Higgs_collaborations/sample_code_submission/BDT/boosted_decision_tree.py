@@ -22,7 +22,7 @@ class XGBoost_BDT:
             reg_lambda=1.0,           # Régularisation L2
             use_label_encoder=False,
             eval_metric="logloss",
-            early_stopping_rounds=5, # S'arrête si la validation ne s'améliore plus pendant 60 arbres
+            early_stopping_rounds=15, # S'arrête si la validation ne s'améliore plus pendant 60 arbres
             random_state=42,
         )
 
