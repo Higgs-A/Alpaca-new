@@ -24,7 +24,7 @@ jobs:
 
       - name: Spell check with codespell
         run: |
-          codespell --ignore-words .github/workflows/my_dictionary.txt sample_code_submission
+          codespell --ignore-words .github/workflows/my_dictionary.txt Higgs_collaborations/sample_code_submission
 
       - name: Format check with black
         run: |
@@ -50,7 +50,7 @@ jobs:
       - name: Run evaluation
         run: |
           python3 -m HiggsML.run_competition \
-            --submission sample_code_submission \
-            --output sample_result_submission \
+            --submission Higgs_collaborations/sample_code_submission \
+            --output Higgs_collaborations/sample_result_submission \
             --num-of-sets 2 \
             --num-pseudo-experiments 5 

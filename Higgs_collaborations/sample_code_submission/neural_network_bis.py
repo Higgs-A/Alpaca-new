@@ -1,8 +1,3 @@
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
-
-
-
 import os
 import joblib
 import numpy as np
@@ -21,15 +16,14 @@ from sklearn.preprocessing import StandardScaler
 
 class NeuralNetwork:
 
-    def __init__(self, n_features=None, train_data = None):
+    def __init__(self, n_features=None):
         self.model  = None
         self.scaler = StandardScaler()
 
         self._predictions  = None
         self._test_labels  = None
         self._test_weights = None
-        if n_features is None and train_data is not None :
-            n_features = train_data.shape[1]
+
         if n_features is not None:
             self._initialize_model(n_features)
 
@@ -61,30 +55,15 @@ class NeuralNetwork:
         )
 
     def fit(self, train_data, y_train, weights_train=None):
-        """Train the model."""
-        #model_dir = os.path.dirname(os.path.abspath(__file__))
-        #from pathlib import Path
-        #model_dir = Path("weighted_best_model")
-        '''
-        model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "weighted_best_model")
-        print(model_dir)
-        self.model = load_model(os.path.join(model_dir, "model.keras"))
-        self.scaler = joblib.load(os.path.join(model_dir, "scaler.pkl"))'''
-        import torch
-        import joblib
-        
-        model_dir = "/content/drive/MyDrive/higgs_nn"
-
-        model_path = os.path.join(model_dir, "model.pt")
-        scaler_path = os.path.join(model_dir, "scaler.pkl")
-        self.scaler = joblib.load(scaler_path)
-        self.model = self.build_model()
-        self.model.load_state_dict(torch.load(model_path, map_location="cpu"))
-        self.model.eval()
-
-        print("Model loaded from Drive")
-
-        return self
+        """
+        By design, this method loads a pretrained model from disk
+        rather than training from scratch.
+        The training notebook (Melkior_NN.ipynb) handles actual training
+        and saves model.keras + scaler.pkl alongside this file.
+        Those files are committed to the repo so the submission is self-contained.
+        """
+        model_dir = os.path.dirname(os.path.abspath(__file__))
+        self.load_model(model_dir)
 
     def predict(self, test_data, labels=None, weights=None):
         self._predictions = self.model.predict(
@@ -104,29 +83,20 @@ class NeuralNetwork:
             raise ValueError("No predictions found. Call predict() first.")
         if self._test_labels is None:
             raise ValueError(
-                "True labels for test data are not available. Please provide them when calling predict()."
+                "True labels not available. Provide them when calling predict()."
             )
 
-        def __amsasimov(s_in, b_in):
-            s = np.asarray(s_in, float)
-            b = np.asarray(b_in, float)
-            # Mask low-statistics region: b < 1 means the Poisson approximation
-            # underlying AMS has broken down — results there are not meaningful.
-            valid = (b >= 1.0) & (s >= 0)
-            safe_b = np.where(valid, b, 1.0)
-            safe_s = np.where(valid, s, 0.0)
-            ams = np.sqrt(2 * ((safe_s + safe_b) * np.log(1 + safe_s / safe_b) - safe_s))
-            ams = np.where(valid, ams, np.nan)
-            if np.isscalar(s_in):
-                return float(ams)
-            else:
-                return ams
+        B_REG = 10.0
 
-        def __significance_vscore(y_true, y_score, sample_weight=None):
-            if sample_weight is None:
-                sample_weight = np.full(len(y_true), 1.0)
-            else:
-                sample_weight = np.asarray(sample_weight)
+        def __ams(s, b):
+            s = np.asarray(s, float)
+            b = np.asarray(b, float)
+            val = np.sqrt(2 * ((s + b + B_REG) * np.log(1 + s / (b + B_REG)) - s))
+            val = np.where(s < 0, np.nan, val)
+            return val
+
+        def __significance_vscore(y_true, y_score, sample_weight):
+            sample_weight = np.asarray(sample_weight)
             bins = np.linspace(0, 1.0, 101)
             s_hist, _ = np.histogram(
                 y_score[y_true == 1], bins=bins, weights=sample_weight[y_true == 1]
@@ -136,41 +106,47 @@ class NeuralNetwork:
             )
             s_cumul = np.cumsum(s_hist[::-1])[::-1]
             b_cumul = np.cumsum(b_hist[::-1])[::-1]
-            significance = __amsasimov(s_cumul, b_cumul)
-            return significance
+            return __ams(s_cumul, b_cumul)
 
-        vamsasimov_xgb = __significance_vscore(
+        ams_curve = __significance_vscore(
             y_true=self._test_labels,
             y_score=self._predictions,
             sample_weight=self._test_weights,
         )
 
-        plt.plot(np.linspace(0, 1.0, 100), vamsasimov_xgb, label="AMS Significance")
-        plt.xlabel("Score")
-        plt.ylabel("Significance")
-        return float(np.nanmax(vamsasimov_xgb))
+        plt.plot(np.linspace(0, 1.0, 100), ams_curve, label="AMS Significance")
+        plt.xlabel("Score threshold")
+        plt.ylabel("AMS")
+        return float(np.nanmax(ams_curve))
 
-    def plot_learning_curves(self, weighted_test_auc=None):
+    def plot_learning_curves(self, weighted_test_auc=None, unweighted_test_auc=None):
         if not hasattr(self, "history"):
             raise ValueError("Model must be trained before plotting learning curves.")
         fig, ax1 = plt.subplots(figsize=(10, 5))
         ax2 = ax1.twinx()
 
-        l1, = ax1.plot(self.history.history["auc"],     color="tab:blue",   label="AUC (train)")
-        # val_auc is computed on the internal validation split WITHOUT event weights
-        # — it is optimistic relative to the weighted test AUC.
         l2, = ax2.plot(self.history.history["loss"],    color="tab:orange", label="Loss (train)")
-        lines = [l1, l2]
+        lines = [l2]
         if "val_auc" in self.history.history:
-            l3, = ax1.plot(self.history.history["val_auc"],  color="tab:blue",   linestyle="--", label="AUC (internal val, unweighted)")
+            l3, = ax1.plot(self.history.history["val_auc"], color="tab:blue", linestyle="--",
+                           label="AUC (internal val, unweighted)")
             lines.append(l3)
         if "val_loss" in self.history.history:
-            l4, = ax2.plot(self.history.history["val_loss"], color="tab:orange", linestyle="--", label="Loss (internal val, unweighted)")
+            l4, = ax2.plot(self.history.history["val_loss"], color="tab:orange", linestyle="--",
+                           label="Loss (internal val)")
             lines.append(l4)
-        if weighted_test_auc is not None:
-            l5 = ax1.axhline(weighted_test_auc, color="tab:green", linestyle=":", linewidth=1.5,
-                             label=f"AUC (weighted test set) = {weighted_test_auc:.4f}")
+        if hasattr(self, "auc_train_unweighted"):
+            l1 = ax1.axhline(self.auc_train_unweighted, color="tab:blue", linestyle="-", linewidth=1.2,
+                             label=f"AUC (train, unweighted) = {self.auc_train_unweighted:.4f}")
+            lines.append(l1)
+        if unweighted_test_auc is not None:
+            l5 = ax1.axhline(unweighted_test_auc, color="tab:green", linestyle=":", linewidth=1.5,
+                             label=f"AUC (test, unweighted) = {unweighted_test_auc:.4f}")
             lines.append(l5)
+        if weighted_test_auc is not None:
+            l6 = ax1.axhline(weighted_test_auc, color="tab:red", linestyle=":", linewidth=1.5,
+                             label=f"AUC (test, weighted) = {weighted_test_auc:.4f}")
+            lines.append(l6)
 
         ax1.set_xlabel("Epochs")
         ax1.set_ylabel("AUC",  color="tab:blue")
@@ -179,13 +155,12 @@ class NeuralNetwork:
         ax2.tick_params(axis="y", labelcolor="tab:orange")
         ax1.legend(lines, [l.get_label() for l in lines])
         ax1.grid(True)
-        plt.title("Learning Curves")
+        plt.title("Learning Curves — all AUC values unweighted for comparability")
         plt.tight_layout()
         plt.show()
 
     def plot_score_distribution(self, X_test, y_test):
         y_pred = self.predict(X_test)
-
         signal_scores = y_pred[y_test == 1]
         bkg_scores    = y_pred[y_test == 0]
 
@@ -199,25 +174,15 @@ class NeuralNetwork:
         plt.grid(True)
         plt.show()
 
-    def save_model(self, path = 'weighted_best_model'):
+    def save_model(self, path='weighted_best_model'):
         """Save the trained model and scaler to the specified path."""
         os.makedirs(path, exist_ok=True)
         self.model.save(os.path.join(path, "model.keras"))
         joblib.dump(self.scaler, os.path.join(path, "scaler.pkl"))
         print(f"Model saved to {path}")
 
-    def load_model(self, path = 'weighted_best_model'):
+    def load_model(self, path='weighted_best_model'):
         """Load the trained model and scaler from the specified path."""
         self.model  = load_model(os.path.join(path, "model.keras"))
         self.scaler = joblib.load(os.path.join(path, "scaler.pkl"))
         print(f"Model loaded from {path}")
-
-
-'''
-NN = NeuralNetwork()
-NN.load_modet()
-predict = NN.predict(test_data)
-
-
-
-'''
