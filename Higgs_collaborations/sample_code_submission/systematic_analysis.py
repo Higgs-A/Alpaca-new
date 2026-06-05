@@ -1,10 +1,147 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from HiggsML.systematics import systematics
-from utils import plot_given_hist
-import model
 
-######################################################################### version avec dico
+
+def tes_fitter(
+     model,
+     train_set,
+ ):
+     """
+     Task 1 : Analysis TES Uncertainty
+     1. Loop over different values of tes and make store the score
+     2. Make a histogram of the score
+
+     Task 2 : Fit the histogram
+     1. Write a function to loop over different values of tes and histogram and make fit function for each bin in the histogram
+     2. store the fit functions in an array
+     3. return the fit functions
+
+       histogram and make fit function which transforms the histogram for any given TES
+
+     """
+     syst_set = systematics(train_set, tes=1)
+     score = model.predict(syst_set["data"])
+
+     histogram = np.histogram(score, bins=100, range=(0, 1))
+
+     # Write a function to loop over different values of tes and histogram and make fit function which transforms the histogram for any given TES
+
+     def fit_function(array, tes):
+        #  Dummy fit function, replace with actual fitting procedure
+         return [array[i] * f[i](tes) for i in range(len(array))]
+
+     return fit_function
+
+
+def jes_fitter(
+     model,
+     train_set,
+ ):
+     """
+     Task 1 : Analysis JES Uncertainty
+     1. Loop over different values of jes and store the score
+     2. Make a histogram of the score
+
+     Task 2 : Fit the histogram
+     1. Write a function to loop over different values of JES and histogram and make fit function for each bin in the histogram
+     2. store the fit functions in an array
+     3. return the fit functions
+
+       histogram and make fit function which transforms the histogram for any given jes
+
+     """
+     syst_set = systematics(train_set, jes=1)
+     score = model.predict(syst_set["data"])
+
+     histogram = np.histogram(score, bins=100, range=(0, 1))
+
+     # Write a function to loop over different values of jes and histogram and make fit function which transforms the histogram for any given JES
+
+     def fit_function(array, jes):
+    #Dummy fit function, replace with actual fitting procedure
+        return array * jes
+
+     return fit_function
+
+def met_fitter(
+     model,
+     eval_set,
+     met_variations=np.array([-3.0, 0.0, 3.0])
+ ):
+     """
+     Analyse de l'incertitude Soft MET.
+     On applique des variations absolues (en GeV).
+     """
+     histograms = []
+     bins = 100
+    
+     # 1. On génère les histogrammes pour chaque variation de MET
+     for met in met_variations:
+          #/!\ Vérifie le nom de l'argument: soft_met ou met_unclustered
+         syst_set = systematics(eval_set, soft_met=met) 
+         score = model.predict(syst_set["data"])
+        
+         hist, _ = np.histogram(score, bins=bins, range=(0, 1))
+         histograms.append(hist)
+        
+     histograms = np.array(histograms)
+    
+      #2. On "fit" un polynôme de degré 2 pour chaque bin de l'histogramme
+     poly_coeffs = []
+     for i in range(bins):
+         coeffs = np.polyfit(met_variations, histograms[:, i], deg=2)
+         poly_coeffs.append(coeffs)
+        
+     poly_coeffs = np.array(poly_coeffs)
+    
+     # 3. La fonction à renvoyer à stat
+     def fit_function(base_histogram, met_value):
+         new_hist = np.zeros_like(base_histogram, dtype=float)
+         for i in range(len(new_hist)):
+             new_hist[i] = np.polyval(poly_coeffs[i], met_value)
+         return np.clip(new_hist, 0, None)  #Empêche d'avoir un nombre de particules négatif
+
+     return fit_function
+
+
+
+    
+def bkg_fitter(model, eval_set, bkg_variations=np.array([0.95, 1.00, 1.05])):
+     """
+     Analyse de l'incertitude sur la normalisation du bruit de fond (BKGnorm).
+     Variation relative (0.95 = -5%, 1.05 = +5%).
+     """
+     histograms = []
+     bins = 100
+    
+     for bkg in bkg_variations:
+        #  /!\ Vérifie le nom de l'argument: bkg_scale, bkg_norm, etc.
+         syst_set = systematics(eval_set, bkg_scale=bkg)
+         score = model.predict(syst_set["data"])
+        
+         hist, _ = np.histogram(score, bins=bins, range=(0, 1))
+         histograms.append(hist)
+        
+     histograms = np.array(histograms)
+    
+     poly_coeffs = []
+     for i in range(bins):
+         coeffs = np.polyfit(bkg_variations, histograms[:, i], deg=2)
+         poly_coeffs.append(coeffs)
+        
+     poly_coeffs = np.array(poly_coeffs)
+    
+     def fit_function(base_histogram, bkg_value):
+         new_hist = np.zeros_like(base_histogram, dtype=float)
+         for i in range(len(new_hist)):
+             new_hist[i] = np.polyval(poly_coeffs[i], bkg_value)
+         return np.clip(new_hist, 0, None)
+
+     return fit_function
+
+
+######################################################################## version avec dico
 
 # Configuration des valeurs nominales par défaut
 NOMINALS = {
@@ -169,11 +306,15 @@ def calcul_prediction_totale(parametres, saved_info,num_bins=num_bins):
     return pred_S, pred_B
 
 
-def param_fitter(model, training_dict, num_bins=num_bins):
+def param_fitter_S(model, training_dict, num_bins=num_bins):
+    """ model : votre modèle entrainé (exemple my_model.model )
+        training_dict : votre dictionnaire d'entrainement (exemple my_model.training_set)
+        num_bins : le nombre de bins que vous avez choisi pour votre histogramme
+    """
     saved_info = generer_saved_info(model, training_dict, num_bins=num_bins)
 
 
-    def obtenir_prediction_tous_bins(tes=1.0, jes=1.0, bnorm=1.0, smet=0.0):
+    def obtenir_prediction_tous_bins_S(tes=1.0, jes=1.0, bnorm=1.0, smet=0.0):
         """
         Calcule la prédiction finale (Nominal + Deltas) pour l'intégralité des bins
         pour le Signal et le Background.
@@ -187,7 +328,7 @@ def param_fitter(model, training_dict, num_bins=num_bins):
             tuple: (liste_S, liste_B) contenant les prédictions pour chaque bin.
         """
         pred_S = []
-        pred_B = []
+
 
         # On parcourt tous les bins un par un
         for i in range(num_bins):
@@ -196,12 +337,42 @@ def param_fitter(model, training_dict, num_bins=num_bins):
                               saved_info=saved_info, classe="S")
             pred_S.append(n_s)
 
-            # Calcul pour le Background dans le bin i
+        return pred_S
+    
+    return obtenir_prediction_tous_bins_S
+
+def param_fitter_B(model, training_dict, num_bins=num_bins):
+    """ model : votre modèle entrainé (exemple my_model.model )
+        training_dict : votre dictionnaire d'entrainement (exemple my_model.training_set)
+        num_bins : le nombre de bins que vous avez choisi pour votre histogramme
+    """
+    saved_info = generer_saved_info(model, training_dict, num_bins=num_bins)
+
+
+    def obtenir_prediction_tous_bins_B(tes=1.0, jes=1.0, bnorm=1.0, smet=0.0):
+        """
+        Calcule la prédiction finale (Nominal + Deltas) pour l'intégralité des bins
+        pour le Signal et le Background.
+
+        Args:
+            saved_info (dict): Le dictionnaire généré par generer_saved_info
+            tes, jes, bnorm, smet (float): Les valeurs courantes des paramètres systématiques (parametre)
+            num_bins (int): Le nombre de bins total (par défaut configuré au début de ton script)
+
+        Returns:
+            tuple: (liste_S, liste_B) contenant les prédictions pour chaque bin.
+        """
+        pred_B = []
+
+
+        # On parcourt tous les bins un par un
+        for i in range(num_bins):
+            # Calcul pour le Signal dans le bin i
             n_b = N_total_bin(bin_i=i, tes=tes, jes=jes, bnorm=bnorm, smet=smet, 
                               saved_info=saved_info, classe="B")
             pred_B.append(n_b)
 
-        return pred_S, pred_B
+        return pred_B
     
-    return obtenir_prediction_tous_bins
+    return obtenir_prediction_tous_bins_B
     
