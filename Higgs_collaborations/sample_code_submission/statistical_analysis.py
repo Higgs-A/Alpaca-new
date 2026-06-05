@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import model
 import os
 import joblib
-#import Higgs_collaborations.sample_code_submission.systematic_analysis as sys
+from scipy.interpolate import interp1d
 
 """
 Task 1a : Counting Estimator
@@ -31,22 +31,15 @@ Task 2 : Systematic Uncertainty
 
 """
 def compute_mu(score, weight, saved_info):
-
     score = score.flatten() > saved_info["threshold"]
     score = score.astype(int)
-
     N_obs = np.sum(score * weight)
-
     mu = (
         N_obs - saved_info["beta"]
     ) / saved_info["gamma"]
-
     del_mu_stat = (np.sqrt(saved_info["beta"]+ saved_info["gamma"])/ saved_info["gamma"])
-
     del_mu_sys = 0.0
-
     del_mu_tot = del_mu_stat
-
     return {
         "mu_hat": mu,
         "del_mu_stat": del_mu_stat,
@@ -55,53 +48,34 @@ def compute_mu(score, weight, saved_info):
     }
 
 def calculate_saved_info(model, holdout_set):
-
     score = model.predict(holdout_set["data"])
-
     print("score shape before threshold", score.shape)
-
-    #We compute the optimized threshold by avergage median signficance method
     MAX = sorted(set(score.flatten()))[-1] 
-    threshold_list = np.linspace(0, MAX, 100) #We generate 100 values of potential threshold values 
+    threshold_list = np.linspace(0, MAX, 100)  
     ams = [0] * 100
- 
-    for i, t in enumerate(threshold_list): #We iterate over the values of threshold in order to compute AMS
- 
+    for i, t in enumerate(threshold_list): 
         score_bis = score.flatten() > t
         score_bis = score_bis.astype(int)
- 
-        if np.sum(score_bis)==0: 
+        if np.sum(score_bis)==0:
             continue
-
         label = holdout_set["labels"]
- 
         gamma = np.sum(holdout_set["weights"] * score_bis * label)
- 
         beta = np.sum(holdout_set["weights"] * score_bis* (1 - label))
- 
         ams[i] = np.sqrt(2 * ((gamma + beta) * np.log(1 + gamma / beta) - gamma))
- 
     index = np.argmax(ams)
     threshold = threshold_list[index]
     score = score.flatten() > threshold
     score = score.astype(int)
-
     label = holdout_set["labels"]
-
     gamma = np.sum(
     holdout_set["weights"] * score * label
     )
-
     beta = np.sum(
     holdout_set["weights"] * score * (1 - label)
     )
-
     print("score shape after threshold", score.shape)
-
     gamma = np.sum(holdout_set["weights"] * score * label)
-
     beta = np.sum(holdout_set["weights"] * score * (1 - label))
-
     saved_info = {
     "beta": beta,
     "gamma": gamma,
@@ -114,9 +88,7 @@ N_bins = 5
 
 def prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
     '''Objective : splitting signal, background, and data into binned arrays for the NLL'''
-    # bin boundaries between 0 and 1
     bin_edges = np.linspace(0.0, 1.0, N_bins + 1)
-    # each array bin by bin
     N_obs, _ = np.histogram(N_scores, bins=bin_edges, weights=N_weights)
     S, _ = np.histogram(S_scores, bins=bin_edges, weights=S_weights)
     B, _ = np.histogram(B_scores, bins=bin_edges, weights=B_weights)
@@ -136,71 +108,47 @@ def compute_mu_binned(mu0, N_bins, S_scores, S_weights, B_scores, B_weights, N_s
     Estimate mu using the binned likelihood method.
     '''
     Nb, Sb, Bb = prepare_binned(N_bins, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights)
-    m = Minuit(lambda mu: NLL(mu, Nb, Sb, Bb), mu=mu0) #mu est le paramètre à estimer, initialisé à 1.0 (les autres paramètres sont fixés)
-    m.errordef = Minuit.LIKELIHOOD # on minimise NLL
-    m.migrad()  # recherche du minimum
-    m.hesse()   # calcul des erreurs
-    #résultats
-    print("mu_hat =", m.values["mu"])  #valeur estimée de mu qui minimise la NLL
-    print("sigma_mu =", m.errors["mu"]) #incertitudes sur mu
-    print("NLL_min =", m.fval) # valeur minimale de NLL3
-
-
+    m = Minuit(lambda mu: NLL(mu, Nb, Sb, Bb), mu=mu0) 
+    m.errordef = Minuit.LIKELIHOOD 
+    m.migrad()
+    m.hesse() 
+    print("mu_hat =", m.values["mu"])  
+    print("sigma_mu =", m.errors["mu"]) 
+    print("NLL_min =", m.fval) 
 
 def prepare_unbinned(S_scores, S_weights, B_scores, B_weights):
     """Création des PDFs continues grâce aux scores et poids des simulations."""
     pdf_S = gaussian_kde(S_scores, weights=S_weights)
-    pdf_B = gaussian_kde(B_scores, weights=B_weights)
-    
-    # Pour un nombre total attendu mu=1
+    pdf_B = gaussian_kde(B_scores, weights=B_weights)    
     N_S_expected = np.sum(S_weights)
     N_B_expected = np.sum(B_weights)
     return pdf_S, pdf_B, N_S_expected, N_B_expected
 
 
 def unbinned_NLL(mu, N_scores, N_weights, pdf_S, pdf_B, N_S_exp, N_B_exp):
-    if mu < 0:  # pénalité si minuit teste un mu négatif
+    if mu < 0:  
         return 1e10  
-    
     N_expected_total = mu * N_S_exp + N_B_exp
-    
-    # PDFs absolues
     f_S = pdf_S(N_scores)
     f_B = pdf_B(N_scores)
-    
-    # terme de densité absolue pour chaque événement observé
     prediction_par_evenement = mu * N_S_exp * f_S + N_B_exp * f_B
-    prediction_par_evenement = np.maximum(prediction_par_evenement, 1e-10) # Évite le log(0)
-    
-    # Extended Unbinned NLL
+    prediction_par_evenement = np.maximum(prediction_par_evenement, 1e-10)
     nll_val = N_expected_total - np.sum(N_weights * np.log(prediction_par_evenement))
     return nll_val
 
-
 def compute_mu_unbinned(mu0, S_scores, S_weights, B_scores, B_weights, N_scores, N_weights):
     """Ajustement du paramètre mu via Minuit."""
-    pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights)
-    
+    pdf_S, pdf_B, N_S, N_B = prepare_unbinned(S_scores, S_weights, B_scores, B_weights)    
     nll_func = lambda mu: unbinned_NLL(mu, N_scores, N_weights, pdf_S, pdf_B, N_S, N_B)
     m = Minuit(nll_func, mu=mu0)
     m.limits["mu"] = (0, None)
     m.errordef = Minuit.LIKELIHOOD
     m.migrad() 
     m.hesse()  
-    
-    # Résultats en console
     print("mu_hat =", m.values["mu"])
     print("sigma_mu =", m.errors["mu"])
     print("NLL_min =", m.fval)
     return m.values["mu"]
-
-
-# PLOTS 
-
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
-
 
 def plot_profile_likelihood_scan(
     n_obs,
@@ -226,32 +174,21 @@ def plot_profile_likelihood_scan(
         lam = np.clip(lam, 1e-10, None)
 
         return -(n_obs * np.log(lam) - lam)
-
-    # Scan μ
     mu_values = np.linspace(
         0,
         max(5, 2 * mu_hat + 1),
         1000,
     )
-
     nll_values = np.array(
         [neg_ll(mu) for mu in mu_values]
     )
-
     nll_min = np.min(nll_values)
-
     delta_nll = nll_values - nll_min
-
-    # Mask pour se concentrer sur la région d'intérêt
     mask = delta_nll < 20
-
     mu_values = mu_values[mask]
     delta_nll = delta_nll[mask]
-
-    # Trouver les points où ΔNLL = 0.5 pour l'intervalle de confiance à 1σ
     left_mask = mu_values < mu_hat
     right_mask = mu_values > mu_hat
-
     try:
 
         left_interp = interp1d(
@@ -278,7 +215,6 @@ def plot_profile_likelihood_scan(
         mu_minus = mu_hat
         mu_plus = mu_hat
 
-    # Plot
     plt.figure(figsize=(8, 5))
 
     plt.plot(
@@ -288,7 +224,7 @@ def plot_profile_likelihood_scan(
         label=r"$\Delta$NLL$(\mu)$",
     )
 
-    # Best-fit point
+
     plt.axvline(
         mu_hat,
         color="red",
@@ -303,7 +239,7 @@ def plot_profile_likelihood_scan(
         zorder=5,
     )
 
-    # ΔNLL = 0.5
+
     plt.axhline(
         0.5,
         color="black",
@@ -311,7 +247,7 @@ def plot_profile_likelihood_scan(
         label=r"$\Delta$NLL = 0.5",
     )
 
-    # ±1σ interval
+
     plt.axvline(
         mu_minus,
         color="green",
@@ -331,7 +267,7 @@ def plot_profile_likelihood_scan(
         zorder=5,
     )
 
-    # Labels
+
     plt.annotate(
         rf"$\hat{{\mu}}={mu_hat:.3f}$",
         xy=(mu_hat, 0),
@@ -390,25 +326,25 @@ def plot_binned_profile_likelihood(
     NLL : la fonction de log-vraisemblance négative à minimiser.
     """
 
-    # Scan range around the best-fit value
+
     mu_values = np.linspace(0, max(5, 2 * mu_hat + 1), 1000)
 
-    # Compute NLL scan
+
     nll_values = np.array(
         [NLL(mu, N_obs, S, B) for mu in mu_values]
     )
 
-    #ΔNLL
+
     nll_min = np.min(nll_values)
     delta_nll = nll_values - nll_min
 
-    # Mask pour se concentrer sur la région d'intérêt
+
     mask = delta_nll < 20
 
     mu_values = mu_values[mask]
     delta_nll = delta_nll[mask]
 
-    # Trouver les points où ΔNLL = 0.5 pour l'intervalle de confiance à 1σ
+
     left_mask = mu_values < mu_hat
     right_mask = mu_values > mu_hat
 
@@ -437,7 +373,6 @@ def plot_binned_profile_likelihood(
         mu_minus = mu_hat
         mu_plus = mu_hat
 
-    # Plot
     plt.figure(figsize=(8, 5))
 
     plt.plot(
@@ -447,7 +382,6 @@ def plot_binned_profile_likelihood(
         label=r"$\Delta$NLL$(\mu)$",
     )
 
-    # Best-fit μ
     plt.axvline(
         mu_hat,
         color="red",
@@ -462,7 +396,6 @@ def plot_binned_profile_likelihood(
         zorder=5,
     )
 
-    # 1σ horizontal line
     plt.axhline(
         0.5,
         color="black",
@@ -470,7 +403,6 @@ def plot_binned_profile_likelihood(
         label=r"$\Delta$NLL = 0.5",
     )
 
-    # 1σ interval
     plt.axvline(
         mu_minus,
         color="green",
@@ -490,7 +422,6 @@ def plot_binned_profile_likelihood(
         zorder=5,
     )
 
-    # Annotations
     plt.annotate(
         rf"$\hat{{\mu}}={mu_hat:.3f}$",
         xy=(mu_hat, 0),
@@ -557,13 +488,11 @@ def plot_unbinned_likelihood(Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N
     def neg_ll(mu):
         return unbinned_NLL(mu, Data_scores, Data_weights, pdf_S, pdf_B, N_S_exp, N_B_exp)
  
-    # scan large pour trouver l'ordre de grandeur des intersections
     mu_vals_full = np.linspace(max(0, mu_hat - 2.5), mu_hat + 2.5, 1000)
     nll_vals_full = np.array([neg_ll(mu) for mu in mu_vals_full])
     nll_min = np.min(nll_vals_full)
     delta_nll_full = nll_vals_full - nll_min
  
-    # séparation gauche/droite pour l'interpolation de l'erreur à 1-sigma
     left_mask = mu_vals_full < mu_hat
     right_mask = mu_vals_full > mu_hat
  
@@ -675,9 +604,6 @@ from systematic_analysis import (
 prediction_totale_S = param_fitter_S(model, training_dict, num_bins=5)
 prediction_totale_B = param_fitter_B(model, training_dict, num_bins=5)
 
-##############################################################################
-# NLL COMPLETE
-##############################################################################
 
 def lambda_bin_from_saved_info(
     bin_i,
@@ -805,11 +731,6 @@ def NLL_systematics(
         saved_info=saved_info,
         include_constraints=True,
     )
-
-
-##############################################################################
-# FIT GLOBAL
-##############################################################################
 
 def fit_global(
     n_obs,
@@ -942,7 +863,6 @@ def fit_minuit_nll_with_fixed_params(
     if fixed_params is None:
         fixed_params = {}
 
-    # Si une valeur est fixée explicitement, elle devient la valeur de départ.
     for name, value in fixed_params.items():
         if name in default_initials:
             default_initials[name] = value
@@ -994,11 +914,6 @@ def fit_minuit_nll_with_fixed_params(
     m.hesse()
 
     return m
-
-
-##############################################################################
-# PROFILAGE DES NUISANCES
-##############################################################################
 
 def profile_nuisances(
     mu_fixed,
@@ -1064,11 +979,6 @@ def profile_nuisances(
 
     return m.fval
 
-
-##############################################################################
-# PROFILE LIKELIHOOD SCAN
-##############################################################################
-
 def profile_scan_mu(
     mu_values,
     n_obs,
@@ -1109,11 +1019,6 @@ def profile_scan_mu(
     )
 
     return delta_nll
-
-
-##############################################################################
-# EXTRACTION SIGMA
-##############################################################################
 
 def extract_sigma(
     mu_values,
@@ -1173,36 +1078,26 @@ def extract_sigma(
         sigma_mu,
     )
 
-
-##############################################################################
-# PLOT FINAL
-##############################################################################
-
 def plot_profiled_nuisance_impact(
     n_obs,
     saved_info,
 ):
-
     mu_values = np.linspace(
         0.0,
         3.0,
         120,
     )
-
     scenarios = [
-
         {
             "label": "Stat only",
             "active": [],
         },
-
         {
             "label": "TES",
             "active": [
                 "tes",
             ],
         },
-
         {
             "label": "TES + JES",
             "active": [
@@ -1210,7 +1105,6 @@ def plot_profiled_nuisance_impact(
                 "jes",
             ],
         },
-
         {
             "label": "TES + JES + BNORM + SMET",
             "active": [
@@ -1232,14 +1126,12 @@ def plot_profiled_nuisance_impact(
             "\nFit scenario :",
             scenario["label"]
         )
-
         delta_nll = profile_scan_mu(
             mu_values,
             n_obs,
             saved_info,
             scenario["active"],
         )
-
         (
             mu_hat,
             mu_minus,
@@ -1249,15 +1141,12 @@ def plot_profiled_nuisance_impact(
             mu_values,
             delta_nll,
         )
-
         print(
             f"mu_hat = {mu_hat:.4f}"
         )
-
         print(
             f"sigma_mu = {sigma_mu:.4f}"
         )
-
         plt.plot(
             mu_values,
             delta_nll,
@@ -1267,26 +1156,22 @@ def plot_profiled_nuisance_impact(
                 f"(σμ={sigma_mu:.3f})"
             ),
         )
-
         plt.scatter(
             [mu_hat],
             [0],
             s=50,
         )
-
         plt.scatter(
             [mu_minus, mu_plus],
             [0.5, 0.5],
             s=30,
         )
-
     plt.axhline(
         0.5,
         linestyle="--",
         color="black",
         label=r"$\Delta NLL = 0.5$",
     )
-
     plt.xlabel(
         r"$\mu$",
         fontsize=13,
@@ -1296,23 +1181,17 @@ def plot_profiled_nuisance_impact(
         r"$\Delta NLL$",
         fontsize=13,
     )
-
     plt.title(
         "Profile Likelihood Scan : Impact des Paramètres de Nuisance",
         fontsize=14,
     )
-
     plt.grid(
         True,
         alpha=0.3,
     )
-
     plt.legend()
-
     plt.tight_layout()
-
     plt.show()
-
 
 def plot_minimized_nll_vs_mu_with_fixed_variables(
     mu_values,
@@ -1351,14 +1230,11 @@ def plot_minimized_nll_vs_mu_with_fixed_variables(
         "bnorm": NOMINALS["bkg_scale"],
         "smet": NOMINALS["soft_met"],
     }
-
     fixed_base = {}
     for var in fixed_variables:
         if var not in nominal_from_name:
             raise ValueError(f"Variable non supportee dans fixed_variables: {var}")
         fixed_base[var] = fixed_values.get(var, nominal_from_name[var])
-
-    # Minimum global (mu libre) sous les memes hypotheses de variables fixees.
     fit_global_profiled = fit_minuit_nll_with_fixed_params(
         n_obs=n_obs,
         saved_info=saved_info,
@@ -1367,15 +1243,11 @@ def plot_minimized_nll_vs_mu_with_fixed_variables(
         fixed_params=fixed_base,
         include_constraints=include_constraints,
     )
-
     global_min = fit_global_profiled.fval
-
     profiled_nll = []
-
     for mu in mu_values:
         fixed_at_mu = dict(fixed_base)
         fixed_at_mu["mu"] = float(mu)
-
         fit_mu = fit_minuit_nll_with_fixed_params(
             n_obs=n_obs,
             saved_info=saved_info,
@@ -1384,19 +1256,14 @@ def plot_minimized_nll_vs_mu_with_fixed_variables(
             fixed_params=fixed_at_mu,
             include_constraints=include_constraints,
         )
-
         profiled_nll.append(fit_mu.fval)
-
     profiled_nll = np.asarray(profiled_nll, dtype=float)
     delta_nll = profiled_nll - global_min
-
     mu_values = np.asarray(mu_values, dtype=float)
     idx_best_scan = int(np.argmin(delta_nll))
     mu_best_scan = float(mu_values[idx_best_scan])
-
     left_mask = mu_values < mu_best_scan
     right_mask = mu_values > mu_best_scan
-
     try:
         left_interp = interp1d(
             delta_nll[left_mask],
@@ -1410,7 +1277,6 @@ def plot_minimized_nll_vs_mu_with_fixed_variables(
             bounds_error=False,
             fill_value="extrapolate",
         )
-
         mu_minus = float(left_interp(0.5))
         mu_plus = float(right_interp(0.5))
         sigma_mu = 0.5 * (mu_plus - mu_minus)
@@ -1418,18 +1284,15 @@ def plot_minimized_nll_vs_mu_with_fixed_variables(
         mu_minus = mu_best_scan
         mu_plus = mu_best_scan
         sigma_mu = np.nan
-
     if plot_show:
         plt.figure(figsize=(9, 6))
         plt.plot(mu_values, delta_nll, linewidth=2.2, label=r"$\Delta$NLL profilee")
         plt.scatter([mu_best_scan], [float(delta_nll[idx_best_scan])], s=45, zorder=5, label=fr"$\hat{{\mu}}={mu_best_scan:.3f}$")
         plt.axvline(mu_best_scan, color="red", linestyle="--", alpha=0.9)
         plt.axhline(0.5, linestyle="--", color="black", alpha=0.8, label=r"$\Delta$NLL = 0.5")
-
         plt.axvline(mu_minus, color="green", linestyle=":", alpha=0.9)
         plt.axvline(mu_plus, color="green", linestyle=":", alpha=0.9)
         plt.scatter([mu_minus, mu_plus], [0.5, 0.5], color="green", s=35, zorder=5)
-
         if np.isfinite(sigma_mu):
             plt.hlines(0.5, mu_minus, mu_plus, colors="green", linestyles="-", linewidth=1.8, alpha=0.8)
             plt.annotate(
@@ -1463,7 +1326,6 @@ def plot_minimized_nll_vs_mu_with_fixed_variables(
         plt.legend()
         plt.tight_layout()
         plt.show()
-
     return {
         "mu_values": mu_values,
         "profiled_nll": profiled_nll,
@@ -1477,8 +1339,6 @@ def plot_minimized_nll_vs_mu_with_fixed_variables(
         "fit_global": fit_global_profiled,
         "fixed_params": fixed_base,
     }
-
-
 def plot_minimized_nll_vs_mu_only_10bins(
     mu_values=None,
     n_obs=None,
@@ -1510,9 +1370,6 @@ def plot_minimized_nll_vs_mu_only_10bins(
 
     if mu_values is None:
         mu_values = np.linspace(0.0, 3.0, 80)
-
-    # Si l'utilisateur n'a pas fourni saved_info/n_obs, on les construit
-    # a partir d'un modele deja entraine (NN ou BDT).
     if saved_info is None or n_obs is None:
         saved_info, n_obs = build_saved_info_and_nobs_10bins(
             model_choice=model_choice,
@@ -1522,7 +1379,6 @@ def plot_minimized_nll_vs_mu_only_10bins(
             nn_model_dir=nn_model_dir,
             nbins=10,
         )
-
     return plot_minimized_nll_vs_mu_with_fixed_variables(
         mu_values=mu_values,
         n_obs=n_obs,
@@ -1534,8 +1390,6 @@ def plot_minimized_nll_vs_mu_only_10bins(
         include_constraints=include_constraints,
         plot_show=plot_show,
     )
-
-
 def build_saved_info_and_nobs_10bins(
     model_choice,
     training_dict=None,
@@ -1557,24 +1411,18 @@ def build_saved_info_and_nobs_10bins(
     if training_dict is None:
         raise ValueError(
             "training_dict introuvable. Passe training_dict=... ou initialise model.training_set."
-        )
-
+       )
     chosen = str(model_choice).strip().upper()
-
     if chosen == "NN":
         from neural_network_bis import NeuralNetwork
-
         nn_dir = nn_model_dir
         if nn_dir is None:
             nn_dir = os.path.dirname(os.path.abspath(__file__))
-
         nn_model = NeuralNetwork()
         nn_model.load_model(nn_dir)
         active_model = nn_model
-
     elif chosen == "BDT":
         active_model = None
-
         if pretrained_model is not None:
             active_model = pretrained_model
         elif bdt_checkpoint_path is not None:
@@ -1582,7 +1430,6 @@ def build_saved_info_and_nobs_10bins(
             active_model = checkpoint["model"] if isinstance(checkpoint, dict) and "model" in checkpoint else checkpoint
         else:
             active_model = getattr(model, "model", None)
-
         if active_model is None:
             raise ValueError(
                 "BDT entraine introuvable. Passe pretrained_model=..., "
@@ -1596,14 +1443,11 @@ def build_saved_info_and_nobs_10bins(
         training_dict,
         num_bins=nbins,
     )
-
     n_obs = (
         np.asarray(saved_info["S"]["nominal"], dtype=float)
         + np.asarray(saved_info["B"]["nominal"], dtype=float)
     )
-
     return saved_info, n_obs
-
 
 def plot_superposed_nll_vs_mu_fixed_systematics_10bins(
     mu_values=None,
@@ -1633,7 +1477,6 @@ def plot_superposed_nll_vs_mu_fixed_systematics_10bins(
         nn_model_dir=nn_model_dir,
         nbins=10,
     )
-
     scenarios = [
         ("1 fixee (TES+1sigma)", ["tes"], {"tes": SIGMA_SHIFTS["tes"]["plus"]}),
         (
@@ -1661,10 +1504,8 @@ def plot_superposed_nll_vs_mu_fixed_systematics_10bins(
             },
         ),
     ]
-
     results = {}
     plt.figure(figsize=(10, 7))
-
     for label, fixed_vars, fixed_vals in scenarios:
         res = plot_minimized_nll_vs_mu_with_fixed_variables(
             mu_values=mu_values,
@@ -1676,7 +1517,6 @@ def plot_superposed_nll_vs_mu_fixed_systematics_10bins(
             include_constraints=include_constraints,
             plot_show=False,
         )
-
         results[label] = res
         plt.plot(
             res["mu_values"],
@@ -1692,16 +1532,13 @@ def plot_superposed_nll_vs_mu_fixed_systematics_10bins(
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
-
     if plot_show:
         plt.show()
-
     return {
         "saved_info": saved_info,
         "n_obs": n_obs,
         "results": results,
     }
-
 
 def plot_superposed_nll_vs_mu_fixed_systematics_25bins(
     mu_values=None,
@@ -1731,7 +1568,6 @@ def plot_superposed_nll_vs_mu_fixed_systematics_25bins(
         nn_model_dir=nn_model_dir,
         nbins=25,
     )
-
     scenarios = [
         ("1 fixee (TES+1sigma)", ["tes"], {"tes": SIGMA_SHIFTS["tes"]["plus"]}),
         (
@@ -1759,10 +1595,8 @@ def plot_superposed_nll_vs_mu_fixed_systematics_25bins(
             },
         ),
     ]
-
     results = {}
     plt.figure(figsize=(10, 7))
-
     for label, fixed_vars, fixed_vals in scenarios:
         res = plot_minimized_nll_vs_mu_with_fixed_variables(
             mu_values=mu_values,
@@ -1782,7 +1616,6 @@ def plot_superposed_nll_vs_mu_fixed_systematics_25bins(
             linewidth=2.1,
             label=f"{label} | mu_hat={res['mu_hat']:.3f}",
         )
-
     plt.axhline(0.5, linestyle="--", color="black", alpha=0.8, label=r"$\Delta$NLL = 0.5")
     plt.xlabel(r"$\mu$")
     plt.ylabel(r"$\Delta$NLL")
@@ -1800,10 +1633,6 @@ def plot_superposed_nll_vs_mu_fixed_systematics_25bins(
         "results": results,
     }
 
-
-##############################################################################
-# EXECUTION
-##############################################################################
 if __name__ == "__main__":
     training_dict = getattr(model, "training_set", None)
     model_choice = os.environ.get("MODEL_CHOICE", "NN")
