@@ -23,3 +23,12 @@ ajustement
 instanciation
 reponse
 complet
+contraint
+limite
+correspondance
+groupe
+adapte
+copie
+bord
+vas
+colums
