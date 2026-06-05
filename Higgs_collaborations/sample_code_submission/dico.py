@@ -8,7 +8,6 @@ from sklearn.model_selection import train_test_split
 # Importations de vos fichiers locaux
 from model import Model
 from HiggsML.systematics import systematics
-from systematic_analysis import tes_fitter, jes_fitter
 
 # Configuration des valeurs nominales par défaut
 NOMINALS = {
@@ -35,8 +34,8 @@ PARAM_MAPPING = {
     "smet": "soft_met"
 }
 
-# nombre de bins 
-num_bins = 6
+# nombre de bins
+num_bins = 100
 
 # ==============================================================================
 # FONCTION DEMANDEE PAR LE PROFESSEUR : GENERATION DE SAVED_INFO
@@ -122,7 +121,7 @@ def generer_saved_info(model, training_dict, num_bins=num_bins):
 # ZONE 1 : DASHBOARD VISUEL (POUR VOS VERIFICATIONS VISUELLES)
 # ==============================================================================
 
-def visualiser_impact_systematique(model, training_dict, syst_name="tes", param_min=0.7, param_max=1.3, step=0.01,num_bins=num_bins):
+def visualiser_impact_systematique(model, training_dict, syst_name="tes", param_min=0.7, param_max=1.3, step=0.005,num_bins=num_bins):
     syst_name_upper = syst_name.upper()
     val_nominale = NOMINALS.get(syst_name, 1.0)
    
@@ -263,7 +262,7 @@ def Delta_gamma_universel(bin_i, sys_val, syst_name, saved_info, classe="S",SIGM
     # Mathématiques
     pente = (delta_plus - delta_minus) / (sys_max - sys_min)
     cste = -pente * sys_nom
-    
+   
     return pente * sys_val + cste
 
 
@@ -271,24 +270,24 @@ def N_total_bin(bin_i, tes, jes, bnorm, smet, saved_info, classe="S"):
     """
     Calcule le nombre total d'événements (S ou B) dans un bin donné
     en additionnant la base nominale et toutes les dérives systématiques.
-    
+   
     Formule : N_i = N_nominale_i + sum(Delta_i)
     """
-    # 1. La base nominale (le point de départ à 1.0 partout)
+    # 1. La base nominale (le point de départ à 1.0 partout, sauf met à 0.0)
     n_nominale = saved_info[classe]["nominal"][bin_i]
-    
+   
     # 2. Calcul de chaque dérive individuelle via votre fonction universelle
     # On additionne les deltas au nominal
     delta_tes = Delta_gamma_universel(bin_i, tes, "tes", saved_info, classe)
     delta_jes = Delta_gamma_universel(bin_i, jes, "jes", saved_info, classe)
     delta_bnorm = Delta_gamma_universel(bin_i, bnorm, "bnorm", saved_info, classe)
     delta_smet = Delta_gamma_universel(bin_i, smet, "smet", saved_info, classe)
-    
+   
     # 3. Somme totale
     n_total = n_nominale + delta_tes + delta_jes + delta_bnorm + delta_smet
-    
+   
     # Sécurité physique : un nombre d'événements ne peut pas être négatif
-    return max(0, n_total)
+    return n_total
 
 # Exemple de ce que fera le groupe STAT :
 def calcul_prediction_totale(parametres, saved_info,num_bins=num_bins):
@@ -302,6 +301,7 @@ def calcul_prediction_totale(parametres, saved_info,num_bins=num_bins):
 def verifier_interpolation(model, training_dict, saved_info, syst_name="tes"):
     """
     Vérifie visuellement si la droite d'interpolation passe bien par les points réels.
+    Adapte dynamiquement la taille de la grille d'affichage au nombre de bins.
     """
     # 1. Configuration des paramètres selon la systématique
     config = {
@@ -312,78 +312,89 @@ def verifier_interpolation(model, training_dict, saved_info, syst_name="tes"):
     }
     cfg = config[syst_name]
     num_bins = len(saved_info["S"][syst_name])
-    
+   
     # 2. Calcul des "Points Réels" (La vérité du modèle)
-    test_values = np.linspace(cfg["min"], cfg["max"], 10)
+    test_values = np.linspace(cfg["min"], cfg["max"], 100)
     real_deltas_s = []
 
     print(f"Calcul des points réels pour vérification {syst_name.upper()}...")
-    
+   
     # Référence nominale
     set_nom = systematics(training_dict.copy(), **{cfg['arg']: cfg['nom']})
     scores_nom = np.array(model.predict(set_nom["data"])).ravel()
     weights_nom = np.array(set_nom["weights"]).ravel()
     is_sig_nom = (np.array(set_nom["labels"]).ravel() == 1.0)
-    
+   
     bins_fixes = np.linspace(np.min(scores_nom), np.max(scores_nom), num_bins + 1)
     nom_counts, _ = np.histogram(scores_nom[is_sig_nom], bins=bins_fixes, weights=weights_nom[is_sig_nom])
 
     for val in test_values:
         set_shift = systematics(training_dict.copy(), **{cfg['arg']: val})
-        # Correction manuelle pour le bnorm
         if syst_name == "bnorm":
             labels = np.array(set_shift["labels"]).ravel()
             set_shift["weights"][labels == 0.0] *= val
-            
+           
         scores = np.array(model.predict(set_shift["data"])).ravel()
         weights = np.array(set_shift["weights"]).ravel()
         is_sig = (np.array(set_shift["labels"]).ravel() == 1.0)
-        
+       
         curr_counts, _ = np.histogram(scores[is_sig], bins=bins_fixes, weights=weights[is_sig])
         real_deltas_s.append(curr_counts - nom_counts)
-    
+   
     real_deltas_s = np.array(real_deltas_s)
 
-    # 3. Affichage des graphiques (Grille de 2x3 pour 6 bins)
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-    axes = axes.flatten()
-    
+    # 3. Calcul dynamique de la taille de la grille (ex: 5 colonnes max)
+    bins_a_tracer = list(range(num_bins // 2, num_bins))
+    n_plots = len(bins_a_tracer)
+   
+    n_cols = 5 if n_plots >= 5 else n_plots
+    n_rows = int(np.ceil(n_plots / n_cols))
+   
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.5 * n_cols, 3 * n_rows))
+    axes = np.atleast_1d(axes).flatten() # Sécurité si 1 seul compartiment
+   
     x_range = np.linspace(cfg["min"], cfg["max"], 100)
 
-    for i in range(num_bins // 2, num_bins):
-        ax = axes[i]
-        
+    # 4. Affichage avec mapping d'index
+    for idx, i in enumerate(bins_a_tracer):
+        ax = axes[idx]
+       
         # A. Tracer les points réels
-        ax.scatter(test_values, real_deltas_s[:, i], color='black', label='Points réels (Modèle)', zorder=3)
-        
-        # B. Tracer la droite d'interpolation (votre fonction Delta_gamma)
-        # On recalcule la pente à partir de saved_info
+        ax.scatter(test_values, real_deltas_s[:, i], color='black', s=20, label='Points réels (Modèle)', zorder=3)
+       
+        # B. Tracer la droite d'interpolation
         d_plus, d_minus = saved_info["S"][syst_name][i]
-        # On récupère les bornes sigma utilisées pour générer saved_info
+       
         if syst_name == "tes": sigma_plus, sigma_minus = 1.03, 0.97
         elif syst_name == "bnorm": sigma_plus, sigma_minus = 1.05, 0.95
-        
+        else: sigma_plus, sigma_minus = SIGMA_SHIFTS[syst_name]["plus"], SIGMA_SHIFTS[syst_name]["minus"]
+       
         pente = (d_plus - d_minus) / (sigma_plus - sigma_minus)
         y_interp = pente * (x_range - cfg["nom"])
-        
+       
         ax.plot(x_range, y_interp, '--', color='red', alpha=0.8, label='Droite Interpolation')
-        
-        ax.set_title(f"Bin {i+1}")
-        ax.axhline(0, color='grey', lw=0.5)
-        ax.axvline(cfg["nom"], color='grey', lw=0.5)
-        if i == 0: ax.legend()
+       
+        ax.set_title(f"Bin {i+1}", fontsize=10)
+        ax.axhline(0, color='grey', lw=0.5, linestyle=':')
+        ax.axvline(cfg["nom"], color='grey', lw=0.5, linestyle=':')
+        if idx == 0:
+            ax.legend(fontsize='xx-small')
 
-    plt.suptitle(f"Validation de l'interpolation linéaire : {syst_name.upper()} (SIGNAL)", fontsize=18)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    # Nettoyage des cases vides si la grille est plus grande que le nombre de plots
+    for j in range(idx + 1, len(axes)):
+        fig.delaxes(axes[j])
+
+    plt.suptitle(f"Validation de l'interpolation linéaire : {syst_name.upper()} (SIGNAL)", fontsize=16)
+    plt.tight_layout()
     plt.show()
 
     # Vérification de la validité de votre modèle de droites
-#verifier_interpolation(mon_wrapper.model, eval_dict, info_pour_stat, syst_name="tes")
+verifier_interpolation(mon_wrapper.model, eval_dict, info_pour_stat, syst_name="tes")
 
 # ==============================================================================
 # TEST DE VALIDATION DE LA FONCTION N_TOTAL
 # ==============================================================================
-
+""""""""""""""""
 print("\n--- TEST DE LA FONCTION N_TOTAL ---")
 
 # 1. On choisit un bin à tester (par exemple le bin 0)
@@ -394,9 +405,9 @@ test_bin = 0
 val_nominale_S = info_pour_stat["S"]["nominal"][test_bin]
 
 calcul_nominale = N_total_bin(
-    bin_i=test_bin, 
+    bin_i=test_bin,
     tes=1.0, jes=1.0, bnorm=1.0, smet=0.0, # Valeurs nominales
-    saved_info=info_pour_stat, 
+    saved_info=info_pour_stat,
     classe="S"
 )
 
@@ -411,9 +422,9 @@ else:
 # 3. TEST AVEC SHIFT : On augmente le TES de 3% (1.03)
 # Le résultat doit être différent de la valeur nominale.
 calcul_shift = N_total_bin(
-    bin_i=test_bin, 
+    bin_i=test_bin,
     tes=1.03, jes=1.02, bnorm=1.04, smet=0.0, # On décale le TES
-    saved_info=info_pour_stat, 
+    saved_info=info_pour_stat,
     classe="S"
 )
 
@@ -422,3 +433,4 @@ print(f"Différence induite : {calcul_shift - val_nominale_S:.2f}")
 
 if calcul_shift != val_nominale_S:
     print("TEST SHIFT RÉUSSI : La systématique est bien prise en compte !")
+"""""""""""""""
