@@ -9,7 +9,7 @@ class XGBoost_BDT:
     Intègre sa propre standardisation, l'early stopping.
     """
 
-    def __init__(self):
+    def __init__(self,train_data=None):
         self.scaler = StandardScaler()
         
         self.model = XGBClassifier(
