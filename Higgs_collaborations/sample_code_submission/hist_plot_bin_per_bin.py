@@ -155,6 +155,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(os.path.dirname(script_dir))
 data_path = os.path.join(root_dir, "blackSwan_data", "blackSwan_data.parquet")
 
+# 1. On charge tout
 df_complet = pd.read_parquet(data_path)
 df_train, df_eval = train_test_split(df_complet, test_size=0.20, random_state=42)
 
@@ -179,7 +180,7 @@ mon_wrapper = Model(
     model_type="BDT"
 )
 
-print("Entraînement du modèle...")
+print("Entraînement du modèle")
 mon_wrapper.fit()
 
 print("Génération des graphiques multi-shifts (sur l'Eval Set)...")
