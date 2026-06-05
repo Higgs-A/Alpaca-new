@@ -13,16 +13,16 @@ class XGBoost_BDT:
         self.scaler = StandardScaler()
         
         self.model = XGBClassifier(
-            n_estimators=1000,        # L'early stopping l'arrêtera bien avant
-            learning_rate=0.05,
-            max_depth=9,
-            subsample=0.8,
-            colsample_bytree=0.8,
+            n_estimators=5000,        # L'early stopping l'arrêtera bien avant
+            learning_rate=0.01,
+            max_depth=8,
+            subsample=0.950,
+            colsample_bytree=0.7,
             reg_alpha=0.1,            # Régularisation L1 (évite l'overfitting)
             reg_lambda=1.0,           # Régularisation L2
             use_label_encoder=False,
             eval_metric="logloss",
-            early_stopping_rounds=60, # S'arrête si la validation ne s'améliore plus pendant 60 arbres
+            early_stopping_rounds=5, # S'arrête si la validation ne s'améliore plus pendant 60 arbres
             random_state=42,
         )
 

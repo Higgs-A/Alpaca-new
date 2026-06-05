@@ -102,9 +102,22 @@ model_class = get_model_choice()
 
 if __name__ == "__main__":
 
-    X_train, X_test,y_train, y_test, w_train,weights_test_arr,bdt, y_pred_test=training_tree(model_class=model_class)
+    X_train, X_test,y_train, y_test, w_train,weights_test,bdt, y_pred_test=training_tree(model_class=model_class)
 
     model_name = model_class.__name__.replace("_BDT", "")
+    
+    TARGET_S = 1015
+    TARGET_B = 1050370
+
+    sum_s_val = np.sum(weights_test[y_test == 1])
+    sum_b_val = np.sum(weights_test[y_test == 0])
+        
+    factor_s = TARGET_S / sum_s_val
+    factor_b = TARGET_B / sum_b_val
+        
+    weights_test_arr = weights_test.copy()
+    weights_test_arr[y_test == 1] *= factor_s
+    weights_test_arr [y_test==0] *= factor_b
     
 # Courbe score
 
