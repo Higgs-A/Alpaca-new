@@ -4,6 +4,9 @@ from HiggsML.systematics import systematics
 from iminuit import Minuit
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
+import model
+import os
+import joblib
 #import Higgs_collaborations.sample_code_submission.systematic_analysis as sys
 
 """
@@ -662,11 +665,121 @@ from scipy.interpolate import interp1d
 from systematic_analysis import (
     generer_saved_info,
     N_total_bin,
+    NOMINALS,
+    SIGMA_SHIFTS,
 )
+
 
 ##############################################################################
 # NLL COMPLETE
 ##############################################################################
+
+def lambda_bin_from_saved_info(
+    bin_i,
+    systematics_values,
+    saved_info,
+):
+    """
+    Construit lambda_i = mu * S_i + B_i à partir des informations de
+    systematic_analysis.
+    """
+    mu = float(systematics_values.get("mu", 1.0))
+    tes = float(systematics_values.get("tes", NOMINALS["tes"]))
+    jes = float(systematics_values.get("jes", NOMINALS["jes"]))
+    bnorm = float(systematics_values.get("bnorm", NOMINALS["bkg_scale"]))
+    smet = float(systematics_values.get("smet", NOMINALS["soft_met"]))
+
+    s_i = N_total_bin(
+        bin_i=bin_i,
+        tes=tes,
+        jes=jes,
+        bnorm=bnorm,
+        smet=smet,
+        saved_info=saved_info,
+        classe="S",
+    )
+
+    b_i = N_total_bin(
+        bin_i=bin_i,
+        tes=tes,
+        jes=jes,
+        bnorm=bnorm,
+        smet=smet,
+        saved_info=saved_info,
+        classe="B",
+    )
+
+    return mu * s_i + b_i
+
+
+def NLL_binned_landa_systematics(
+    n_obs,
+    landa,
+    systematics_values,
+    nbins,
+    saved_info=None,
+    include_constraints=True,
+):
+    """
+    NLL binned avec paramètres explicites:
+      - nbins
+      - landa (tableau des lambda_i ou fonction callable)
+      - systématiques
+
+    Paramètres
+    ----------
+    n_obs : array-like
+        Observations par bin.
+    landa : array-like ou callable
+        Si callable, la signature attendue est:
+        landa(bin_i, systematics_values, saved_info) -> lambda_i
+    systematics_values : dict
+        Valeurs des paramètres de nuisance, ex: tes/jes/bnorm/smet.
+    nbins : int
+        Nombre de bins à utiliser dans la NLL.
+    saved_info : dict, optionnel
+        Dictionnaire des informations de systématiques.
+    include_constraints : bool
+        Ajoute les contraintes gaussiennes sur les nuisances si True.
+    """
+    if nbins <= 0:
+        raise ValueError("nbins must be > 0")
+    if nbins > len(n_obs):
+        raise ValueError("nbins cannot be larger than len(n_obs)")
+
+    nll = 0.0
+
+    for i in range(nbins):
+        if callable(landa):
+            lam = float(landa(i, systematics_values, saved_info))
+        else:
+            lam = float(landa[i])
+
+        lam = max(lam, 1e-10)
+        nll += lam - n_obs[i] * np.log(lam)
+
+    if include_constraints:
+        nuisance_specs = [
+            ("tes", "tes"),
+            ("jes", "jes"),
+            ("bnorm", "bkg_scale"),
+            ("smet", "soft_met"),
+        ]
+
+        for nuisance_name, nominal_key in nuisance_specs:
+            if nuisance_name not in systematics_values:
+                continue
+
+            nominal = NOMINALS[nominal_key]
+            plus = SIGMA_SHIFTS[nuisance_name]["plus"]
+            minus = SIGMA_SHIFTS[nuisance_name]["minus"]
+            sigma = max(abs(plus - nominal), abs(nominal - minus))
+
+            if sigma > 0.0:
+                value = float(systematics_values[nuisance_name])
+                nll += 0.5 * ((value - nominal) / sigma) ** 2
+
+    return nll
 
 def NLL_systematics(
     mu,
@@ -677,52 +790,22 @@ def NLL_systematics(
     n_obs,
     saved_info,
 ):
+    syst = {
+        "mu": mu,
+        "tes": tes,
+        "jes": jes,
+        "bnorm": bnorm,
+        "smet": smet,
+    }
 
-    nll = 0.0
-
-    n_bins = len(n_obs)
-
-    for i in range(n_bins):
-
-        S_i = N_total_bin(
-            bin_i=i,
-            tes=tes,
-            jes=jes,
-            bnorm=bnorm,
-            smet=smet,
-            saved_info=saved_info,
-            classe="S",
-        )
-
-        B_i = N_total_bin(
-            bin_i=i,
-            tes=tes,
-            jes=jes,
-            bnorm=bnorm,
-            smet=smet,
-            saved_info=saved_info,
-            classe="B",
-        )
-
-        lam = mu * S_i + B_i
-
-        lam = max(lam, 1e-10)
-
-        nll += lam - n_obs[i] * np.log(lam)
-
-    ##########################################################################
-    # CONTRAINTES GAUSSIENNES
-    ##########################################################################
-
-    nll += 0.5 * ((tes - 1.0) / 0.03) ** 2
-
-    nll += 0.5 * ((jes - 1.0) / 0.03) ** 2
-
-    nll += 0.5 * ((bnorm - 1.0) / 0.05) ** 2
-
-    nll += 0.5 * ((smet - 0.0) / 3.0) ** 2
-
-    return nll
+    return NLL_binned_landa_systematics(
+        n_obs=n_obs,
+        landa=lambda_bin_from_saved_info,
+        systematics_values=syst,
+        nbins=len(n_obs),
+        saved_info=saved_info,
+        include_constraints=True,
+    )
 
 
 ##############################################################################
@@ -791,6 +874,122 @@ def fit_global(
                 m.values[nuisance] = 0.0
             else:
                 m.values[nuisance] = 1.0
+
+    m.migrad()
+    m.hesse()
+
+    return m
+
+
+def fit_minuit_nll_with_fixed_params(
+    n_obs,
+    saved_info,
+    nbins=None,
+    landa=lambda_bin_from_saved_info,
+    fixed_params=None,
+    initial_values=None,
+    limits=None,
+    include_constraints=True,
+):
+    """
+    Minimise la NLL avec Minuit en fixant un sous-ensemble de paramètres
+    (mu et/ou systématiques) et en laissant les autres libres.
+
+    Paramètres
+    ----------
+    n_obs : array-like
+        Observations par bin.
+    saved_info : dict
+        Informations de systématiques (depuis systematic_analysis).
+    nbins : int, optionnel
+        Nombre de bins utilisés dans la NLL. Par défaut, len(n_obs).
+    landa : callable ou array-like
+        Modèle des lambdas par bin.
+    fixed_params : dict, optionnel
+        Paramètres à fixer avec leurs valeurs, ex:
+        {"tes": 1.0, "jes": 1.0, "bnorm": 1.0, "smet": 0.0}
+    initial_values : dict, optionnel
+        Valeurs initiales pour Minuit.
+    limits : dict, optionnel
+        Limites Minuit, ex: {"mu": (0.0, None)}.
+    include_constraints : bool
+        Active les priors gaussiens sur les nuisances.
+    """
+    if nbins is None:
+        nbins = len(n_obs)
+
+    default_initials = {
+        "mu": 1.0,
+        "tes": NOMINALS["tes"],
+        "jes": NOMINALS["jes"],
+        "bnorm": NOMINALS["bkg_scale"],
+        "smet": NOMINALS["soft_met"],
+    }
+
+    default_limits = {
+        "mu": (0.0, None),
+        "tes": (SIGMA_SHIFTS["tes"]["minus"], SIGMA_SHIFTS["tes"]["plus"]),
+        "jes": (SIGMA_SHIFTS["jes"]["minus"], SIGMA_SHIFTS["jes"]["plus"]),
+        "bnorm": (SIGMA_SHIFTS["bnorm"]["minus"], SIGMA_SHIFTS["bnorm"]["plus"]),
+        "smet": (SIGMA_SHIFTS["smet"]["minus"], SIGMA_SHIFTS["smet"]["plus"]),
+    }
+
+    if initial_values:
+        default_initials.update(initial_values)
+
+    if limits:
+        default_limits.update(limits)
+
+    if fixed_params is None:
+        fixed_params = {}
+
+    # Si une valeur est fixée explicitement, elle devient la valeur de départ.
+    for name, value in fixed_params.items():
+        if name in default_initials:
+            default_initials[name] = value
+
+    def nll(
+        mu,
+        tes,
+        jes,
+        bnorm,
+        smet,
+    ):
+        syst = {
+            "mu": mu,
+            "tes": tes,
+            "jes": jes,
+            "bnorm": bnorm,
+            "smet": smet,
+        }
+
+        return NLL_binned_landa_systematics(
+            n_obs=n_obs,
+            landa=landa,
+            systematics_values=syst,
+            nbins=nbins,
+            saved_info=saved_info,
+            include_constraints=include_constraints,
+        )
+
+    m = Minuit(
+        nll,
+        mu=default_initials["mu"],
+        tes=default_initials["tes"],
+        jes=default_initials["jes"],
+        bnorm=default_initials["bnorm"],
+        smet=default_initials["smet"],
+    )
+
+    m.errordef = Minuit.LIKELIHOOD
+
+    for name, lim in default_limits.items():
+        m.limits[name] = lim
+
+    for name, value in fixed_params.items():
+        if name in default_initials:
+            m.fixed[name] = True
+            m.values[name] = value
 
     m.migrad()
     m.hesse()
@@ -1116,25 +1315,517 @@ def plot_profiled_nuisance_impact(
     plt.show()
 
 
+def plot_minimized_nll_vs_mu_with_fixed_variables(
+    mu_values,
+    n_obs,
+    saved_info,
+    fixed_variables=None,
+    fixed_values=None,
+    nbins=None,
+    landa=lambda_bin_from_saved_info,
+    include_constraints=True,
+    plot_show=True,
+):
+    """
+    Trace la courbe de Delta NLL profilee en fonction de mu en fixant
+    les variables choisies par l'utilisateur.
+
+    fixed_variables : liste des variables a fixer parmi
+    ["tes", "jes", "bnorm", "smet"].
+
+    fixed_values : dictionnaire optionnel des valeurs a fixer,
+    par exemple {"tes": 1.0, "jes": 1.0}. Si une variable fixee n'est
+    pas dans fixed_values, sa valeur nominale est utilisee.
+    """
+    if fixed_variables is None:
+        fixed_variables = []
+
+    if fixed_values is None:
+        fixed_values = {}
+
+    if "mu" in fixed_variables:
+        raise ValueError("mu ne doit pas etre dans fixed_variables pour un scan en fonction de mu")
+
+    nominal_from_name = {
+        "tes": NOMINALS["tes"],
+        "jes": NOMINALS["jes"],
+        "bnorm": NOMINALS["bkg_scale"],
+        "smet": NOMINALS["soft_met"],
+    }
+
+    fixed_base = {}
+    for var in fixed_variables:
+        if var not in nominal_from_name:
+            raise ValueError(f"Variable non supportee dans fixed_variables: {var}")
+        fixed_base[var] = fixed_values.get(var, nominal_from_name[var])
+
+    # Minimum global (mu libre) sous les memes hypotheses de variables fixees.
+    fit_global_profiled = fit_minuit_nll_with_fixed_params(
+        n_obs=n_obs,
+        saved_info=saved_info,
+        nbins=nbins,
+        landa=landa,
+        fixed_params=fixed_base,
+        include_constraints=include_constraints,
+    )
+
+    global_min = fit_global_profiled.fval
+
+    profiled_nll = []
+
+    for mu in mu_values:
+        fixed_at_mu = dict(fixed_base)
+        fixed_at_mu["mu"] = float(mu)
+
+        fit_mu = fit_minuit_nll_with_fixed_params(
+            n_obs=n_obs,
+            saved_info=saved_info,
+            nbins=nbins,
+            landa=landa,
+            fixed_params=fixed_at_mu,
+            include_constraints=include_constraints,
+        )
+
+        profiled_nll.append(fit_mu.fval)
+
+    profiled_nll = np.asarray(profiled_nll, dtype=float)
+    delta_nll = profiled_nll - global_min
+
+    mu_values = np.asarray(mu_values, dtype=float)
+    idx_best_scan = int(np.argmin(delta_nll))
+    mu_best_scan = float(mu_values[idx_best_scan])
+
+    left_mask = mu_values < mu_best_scan
+    right_mask = mu_values > mu_best_scan
+
+    try:
+        left_interp = interp1d(
+            delta_nll[left_mask],
+            mu_values[left_mask],
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+        right_interp = interp1d(
+            delta_nll[right_mask],
+            mu_values[right_mask],
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+
+        mu_minus = float(left_interp(0.5))
+        mu_plus = float(right_interp(0.5))
+        sigma_mu = 0.5 * (mu_plus - mu_minus)
+    except Exception:
+        mu_minus = mu_best_scan
+        mu_plus = mu_best_scan
+        sigma_mu = np.nan
+
+    if plot_show:
+        plt.figure(figsize=(9, 6))
+        plt.plot(mu_values, delta_nll, linewidth=2.2, label=r"$\Delta$NLL profilee")
+        plt.scatter([mu_best_scan], [float(delta_nll[idx_best_scan])], s=45, zorder=5, label=fr"$\hat{{\mu}}={mu_best_scan:.3f}$")
+        plt.axvline(mu_best_scan, color="red", linestyle="--", alpha=0.9)
+        plt.axhline(0.5, linestyle="--", color="black", alpha=0.8, label=r"$\Delta$NLL = 0.5")
+
+        plt.axvline(mu_minus, color="green", linestyle=":", alpha=0.9)
+        plt.axvline(mu_plus, color="green", linestyle=":", alpha=0.9)
+        plt.scatter([mu_minus, mu_plus], [0.5, 0.5], color="green", s=35, zorder=5)
+
+        if np.isfinite(sigma_mu):
+            plt.hlines(0.5, mu_minus, mu_plus, colors="green", linestyles="-", linewidth=1.8, alpha=0.8)
+            plt.annotate(
+                fr"$\hat{{\mu}}={mu_best_scan:.3f}$",
+                xy=(mu_best_scan, 0.0),
+                xytext=(8, 10),
+                textcoords="offset points",
+                color="red",
+            )
+            plt.annotate(
+                fr"$\mu_{{-1\sigma}}={mu_minus:.3f}$",
+                xy=(mu_minus, 0.5),
+                xytext=(-75, 10),
+                textcoords="offset points",
+                color="green",
+            )
+            plt.annotate(
+                fr"$\mu_{{+1\sigma}}={mu_plus:.3f}$",
+                xy=(mu_plus, 0.5),
+                xytext=(10, 10),
+                textcoords="offset points",
+                color="green",
+            )
+            sigma_label = fr"$\hat{{\mu}}={mu_best_scan:.3f}^{{+{(mu_plus - mu_best_scan):.3f}}}_{{-{(mu_best_scan - mu_minus):.3f}}}$"
+            plt.plot([], [], " ", label=sigma_label)
+
+        plt.xlabel(r"$\mu$")
+        plt.ylabel(r"$\Delta$NLL")
+        plt.title("NLL minimisee en fonction de mu (profilage Minuit)")
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+    return {
+        "mu_values": mu_values,
+        "profiled_nll": profiled_nll,
+        "delta_nll": delta_nll,
+        "global_min": global_min,
+        "mu_best_scan": mu_best_scan,
+        "mu_hat": mu_best_scan,
+        "mu_minus": mu_minus,
+        "mu_plus": mu_plus,
+        "sigma_mu": sigma_mu,
+        "fit_global": fit_global_profiled,
+        "fixed_params": fixed_base,
+    }
+
+
+def plot_minimized_nll_vs_mu_only_10bins(
+    mu_values=None,
+    n_obs=None,
+    saved_info=None,
+    landa=lambda_bin_from_saved_info,
+    include_constraints=True,
+    plot_show=True,
+    model_choice=None,
+    training_dict=None,
+    pretrained_model=None,
+    bdt_checkpoint_path=None,
+    nn_model_dir=None,
+):
+    """
+    Cas demande: scan profile en fonction de mu avec uniquement mu fixe
+    a chaque point du scan, et 10 bins.
+
+    Les nuisances (tes, jes, bnorm, smet) restent libres et sont profilees
+    par Minuit pour chaque valeur de mu.
+
+    Mode compatibilite historique:
+    - si n_obs et saved_info sont fournis, ils sont utilises directement.
+
+    Mode "modele deja entraine":
+    - model_choice="NN" : charge model.keras + scaler.pkl (par defaut dans ce dossier)
+    - model_choice="BDT" : utilise pretrained_model, ou un checkpoint joblib,
+      ou model.model si deja present en memoire.
+    """
+
+    if mu_values is None:
+        mu_values = np.linspace(0.0, 3.0, 80)
+
+    # Si l'utilisateur n'a pas fourni saved_info/n_obs, on les construit
+    # a partir d'un modele deja entraine (NN ou BDT).
+    if saved_info is None or n_obs is None:
+        saved_info, n_obs = build_saved_info_and_nobs_10bins(
+            model_choice=model_choice,
+            training_dict=training_dict,
+            pretrained_model=pretrained_model,
+            bdt_checkpoint_path=bdt_checkpoint_path,
+            nn_model_dir=nn_model_dir,
+            nbins=10,
+        )
+
+    return plot_minimized_nll_vs_mu_with_fixed_variables(
+        mu_values=mu_values,
+        n_obs=n_obs,
+        saved_info=saved_info,
+        fixed_variables=[],
+        fixed_values={},
+        nbins=10,
+        landa=landa,
+        include_constraints=include_constraints,
+        plot_show=plot_show,
+    )
+
+
+def build_saved_info_and_nobs_10bins(
+    model_choice,
+    training_dict=None,
+    pretrained_model=None,
+    bdt_checkpoint_path=None,
+    nn_model_dir=None,
+    nbins=10,
+):
+    """
+    Construit (saved_info, n_obs) pour un nombre de bins donne a partir d'un modele
+    deja entraine (NN ou BDT).
+    """
+    if model_choice is None:
+        raise ValueError("model_choice doit etre 'NN' ou 'BDT'.")
+
+    if training_dict is None:
+        training_dict = getattr(model, "training_set", None)
+
+    if training_dict is None:
+        raise ValueError(
+            "training_dict introuvable. Passe training_dict=... ou initialise model.training_set."
+        )
+
+    chosen = str(model_choice).strip().upper()
+
+    if chosen == "NN":
+        from neural_network_bis import NeuralNetwork
+
+        nn_dir = nn_model_dir
+        if nn_dir is None:
+            nn_dir = os.path.dirname(os.path.abspath(__file__))
+
+        nn_model = NeuralNetwork()
+        nn_model.load_model(nn_dir)
+        active_model = nn_model
+
+    elif chosen == "BDT":
+        active_model = None
+
+        if pretrained_model is not None:
+            active_model = pretrained_model
+        elif bdt_checkpoint_path is not None:
+            checkpoint = joblib.load(bdt_checkpoint_path)
+            active_model = checkpoint["model"] if isinstance(checkpoint, dict) and "model" in checkpoint else checkpoint
+        else:
+            active_model = getattr(model, "model", None)
+
+        if active_model is None:
+            raise ValueError(
+                "BDT entraine introuvable. Passe pretrained_model=..., "
+                "ou bdt_checkpoint_path=..., ou initialise model.model en memoire."
+            )
+    else:
+        raise ValueError("model_choice doit etre 'NN' ou 'BDT'.")
+
+    saved_info = generer_saved_info(
+        active_model,
+        training_dict,
+        num_bins=nbins,
+    )
+
+    n_obs = (
+        np.asarray(saved_info["S"]["nominal"], dtype=float)
+        + np.asarray(saved_info["B"]["nominal"], dtype=float)
+    )
+
+    return saved_info, n_obs
+
+
+def plot_superposed_nll_vs_mu_fixed_systematics_10bins(
+    mu_values=None,
+    model_choice=None,
+    training_dict=None,
+    pretrained_model=None,
+    bdt_checkpoint_path=None,
+    nn_model_dir=None,
+    include_constraints=True,
+    plot_show=True,
+):
+    """
+    Plot final superpose de Delta NLL(mu) pour 10 bins, avec:
+    - 1 systematique fixee
+    - 2 systematiques fixees
+    - 3 systematiques fixees
+    - toutes les systematiques fixees
+    """
+    if mu_values is None:
+        mu_values = np.linspace(0.0, 3.0, 80)
+
+    saved_info, n_obs = build_saved_info_and_nobs_10bins(
+        model_choice=model_choice,
+        training_dict=training_dict,
+        pretrained_model=pretrained_model,
+        bdt_checkpoint_path=bdt_checkpoint_path,
+        nn_model_dir=nn_model_dir,
+        nbins=10,
+    )
+
+    scenarios = [
+        ("1 fixee (TES+1sigma)", ["tes"], {"tes": SIGMA_SHIFTS["tes"]["plus"]}),
+        (
+            "2 fixees (TES+JES, +1sigma)",
+            ["tes", "jes"],
+            {"tes": SIGMA_SHIFTS["tes"]["plus"], "jes": SIGMA_SHIFTS["jes"]["plus"]},
+        ),
+        (
+            "3 fixees (TES+JES+BNORM, +1sigma)",
+            ["tes", "jes", "bnorm"],
+            {
+                "tes": SIGMA_SHIFTS["tes"]["plus"],
+                "jes": SIGMA_SHIFTS["jes"]["plus"],
+                "bnorm": SIGMA_SHIFTS["bnorm"]["plus"],
+            },
+        ),
+        (
+            "Toutes fixees (+1sigma)",
+            ["tes", "jes", "bnorm", "smet"],
+            {
+                "tes": SIGMA_SHIFTS["tes"]["plus"],
+                "jes": SIGMA_SHIFTS["jes"]["plus"],
+                "bnorm": SIGMA_SHIFTS["bnorm"]["plus"],
+                "smet": SIGMA_SHIFTS["smet"]["plus"],
+            },
+        ),
+    ]
+
+    results = {}
+    plt.figure(figsize=(10, 7))
+
+    for label, fixed_vars, fixed_vals in scenarios:
+        res = plot_minimized_nll_vs_mu_with_fixed_variables(
+            mu_values=mu_values,
+            n_obs=n_obs,
+            saved_info=saved_info,
+            fixed_variables=fixed_vars,
+            fixed_values=fixed_vals,
+            nbins=10,
+            include_constraints=include_constraints,
+            plot_show=False,
+        )
+
+        results[label] = res
+        plt.plot(
+            res["mu_values"],
+            res["delta_nll"],
+            linewidth=2.1,
+            label=f"{label} | mu_hat={res['mu_hat']:.3f}",
+        )
+
+    plt.axhline(0.5, linestyle="--", color="black", alpha=0.8, label=r"$\Delta$NLL = 0.5")
+    plt.xlabel(r"$\mu$")
+    plt.ylabel(r"$\Delta$NLL")
+    plt.title("NLL finale superposee en fonction de mu (10 bins)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+
+    if plot_show:
+        plt.show()
+
+    return {
+        "saved_info": saved_info,
+        "n_obs": n_obs,
+        "results": results,
+    }
+
+
+def plot_superposed_nll_vs_mu_fixed_systematics_25bins(
+    mu_values=None,
+    model_choice=None,
+    training_dict=None,
+    pretrained_model=None,
+    bdt_checkpoint_path=None,
+    nn_model_dir=None,
+    include_constraints=True,
+    plot_show=True,
+):
+    """
+    Plot final superpose de Delta NLL(mu) pour 25 bins, avec:
+    - 1 systematique fixee
+    - 2 systematiques fixees
+    - 3 systematiques fixees
+    - toutes les systematiques fixees
+    """
+    if mu_values is None:
+        mu_values = np.linspace(0.0, 3.0, 80)
+
+    saved_info, n_obs = build_saved_info_and_nobs_10bins(
+        model_choice=model_choice,
+        training_dict=training_dict,
+        pretrained_model=pretrained_model,
+        bdt_checkpoint_path=bdt_checkpoint_path,
+        nn_model_dir=nn_model_dir,
+        nbins=25,
+    )
+
+    scenarios = [
+        ("1 fixee (TES+1sigma)", ["tes"], {"tes": SIGMA_SHIFTS["tes"]["plus"]}),
+        (
+            "2 fixees (TES+JES, +1sigma)",
+            ["tes", "jes"],
+            {"tes": SIGMA_SHIFTS["tes"]["plus"], "jes": SIGMA_SHIFTS["jes"]["plus"]},
+        ),
+        (
+            "3 fixees (TES+JES+BNORM, +1sigma)",
+            ["tes", "jes", "bnorm"],
+            {
+                "tes": SIGMA_SHIFTS["tes"]["plus"],
+                "jes": SIGMA_SHIFTS["jes"]["plus"],
+                "bnorm": SIGMA_SHIFTS["bnorm"]["plus"],
+            },
+        ),
+        (
+            "Toutes fixees (+1sigma)",
+            ["tes", "jes", "bnorm", "smet"],
+            {
+                "tes": SIGMA_SHIFTS["tes"]["plus"],
+                "jes": SIGMA_SHIFTS["jes"]["plus"],
+                "bnorm": SIGMA_SHIFTS["bnorm"]["plus"],
+                "smet": SIGMA_SHIFTS["smet"]["plus"],
+            },
+        ),
+    ]
+
+    results = {}
+    plt.figure(figsize=(10, 7))
+
+    for label, fixed_vars, fixed_vals in scenarios:
+        res = plot_minimized_nll_vs_mu_with_fixed_variables(
+            mu_values=mu_values,
+            n_obs=n_obs,
+            saved_info=saved_info,
+            fixed_variables=fixed_vars,
+            fixed_values=fixed_vals,
+            nbins=25,
+            include_constraints=include_constraints,
+            plot_show=False,
+        )
+
+        results[label] = res
+        plt.plot(
+            res["mu_values"],
+            res["delta_nll"],
+            linewidth=2.1,
+            label=f"{label} | mu_hat={res['mu_hat']:.3f}",
+        )
+
+    plt.axhline(0.5, linestyle="--", color="black", alpha=0.8, label=r"$\Delta$NLL = 0.5")
+    plt.xlabel(r"$\mu$")
+    plt.ylabel(r"$\Delta$NLL")
+    plt.title("NLL finale superposee en fonction de mu (25 bins)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+
+    if plot_show:
+        plt.show()
+
+    return {
+        "saved_info": saved_info,
+        "n_obs": n_obs,
+        "results": results,
+    }
+
+
 ##############################################################################
 # EXECUTION
 ##############################################################################
+if __name__ == "__main__":
+    training_dict = getattr(model, "training_set", None)
+    model_choice = os.environ.get("MODEL_CHOICE", "NN")
+    bdt_ckpt = os.environ.get("BDT_CHECKPOINT", None)
 
-saved_info = generer_saved_info(
-    model,
-    training_dict,
-)
+    try:
+        result = plot_minimized_nll_vs_mu_only_10bins(
+            mu_values=np.linspace(0.0, 3.0, 80),
+            model_choice=model_choice,
+            training_dict=training_dict,
+            bdt_checkpoint_path=bdt_ckpt,
+            plot_show=True,
+        )
 
-##########################################################################
-# n_obs doit être un tableau de longueur = nombre de bins
-#
-# Exemple :
-#
-# n_obs = np.array([...])
-#
-##########################################################################
-
-plot_profiled_nuisance_impact(
-    n_obs,
-    saved_info,
-)
+        print(
+            "Fit termine:",
+            f"modele={model_choice}",
+            f"mu_hat={result['mu_hat']:.4f}",
+            f"mu_minus={result['mu_minus']:.4f}",
+            f"mu_plus={result['mu_plus']:.4f}",
+        )
+    except Exception as exc:
+        print("Impossible de lancer:", exc)
+        print("Pour BDT, definir BDT_CHECKPOINT=<chemin_joblib> ou charger model.model en memoire.")
