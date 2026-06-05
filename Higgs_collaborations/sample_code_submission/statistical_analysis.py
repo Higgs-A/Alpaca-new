@@ -665,10 +665,15 @@ from scipy.interpolate import interp1d
 from systematic_analysis import (
     generer_saved_info,
     N_total_bin,
+    param_fitter_S,
+    param_fitter_B,
     NOMINALS,
     SIGMA_SHIFTS,
 )
 
+
+prediction_totale_S = param_fitter_S(model, training_dict, num_bins=5)
+prediction_totale_B = param_fitter_B(model, training_dict, num_bins=5)
 
 ##############################################################################
 # NLL COMPLETE
@@ -689,24 +694,18 @@ def lambda_bin_from_saved_info(
     bnorm = float(systematics_values.get("bnorm", NOMINALS["bkg_scale"]))
     smet = float(systematics_values.get("smet", NOMINALS["soft_met"]))
 
-    s_i = N_total_bin(
-        bin_i=bin_i,
+    s_i = prediction_totale_S[bin_i](
         tes=tes,
         jes=jes,
         bnorm=bnorm,
         smet=smet,
-        saved_info=saved_info,
-        classe="S",
     )
 
-    b_i = N_total_bin(
-        bin_i=bin_i,
+    b_i = prediction_totale_B[bin_i](
         tes=tes,
         jes=jes,
         bnorm=bnorm,
         smet=smet,
-        saved_info=saved_info,
-        classe="B",
     )
 
     return mu * s_i + b_i
